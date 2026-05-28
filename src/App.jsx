@@ -339,28 +339,24 @@ function BookSearchSelect({books, selectedId, onChange, filterFn}){
 }
 
 
-// ── BookCover — Open Library URL (no API call, CORS-safe) ─────
-const coverCache = {};
-function getStaticCoverUrl(book) {
-  // 1. Open Library: direct URL from ISBN — no API call needed
-  if(book.isbn) {
-    const clean = book.isbn.replace(/[^0-9X]/gi,'');
-    if(clean.length >= 10) return `https://covers.openlibrary.org/b/isbn/${clean}-M.jpg`;
-  }
-  return null;
-}
-
+// ── BookCover — proxies Amazon images via /api/cover ──────────
 function BookCover({book, width=48, height=66, radius=4}){
-  const staticUrl = getStaticCoverUrl(book);
-  const [url, setUrl] = useState(staticUrl || '');
   const [failed, setFailed] = useState(false);
 
-  useEffect(() => {
-    const u = getStaticCoverUrl(book);
-    setUrl(u || '');
-    setFailed(false);
-  }, [book.id, book.isbn]);
+  // Build proxy URL from coverUrl (Amazon) or isbn (Open Library fallback)
+  const getUrl = () => {
+    if(book.coverUrl && !failed) {
+      // Route through our Vercel proxy to bypass CORS
+      return `/api/cover?url=${encodeURIComponent(book.coverUrl)}`;
+    }
+    if(book.isbn) {
+      const clean = book.isbn.replace(/[^0-9X]/gi,'');
+      if(clean.length >= 10) return `https://covers.openlibrary.org/b/isbn/${clean}-M.jpg`;
+    }
+    return null;
+  };
 
+  const url = getUrl();
   const style = {width, height, borderRadius:radius, flexShrink:0, objectFit:'cover', border:'1px solid var(--rule)'};
   const ph = (
     <div style={{...style, background:'var(--mint-pale)', display:'flex', alignItems:'center',
@@ -369,7 +365,7 @@ function BookCover({book, width=48, height=66, radius=4}){
       {book.title?.slice(0,12)}
     </div>
   );
-  if(!url || failed) return ph;
+  if(!url) return ph;
   return <img src={url} alt="" style={style} onError={()=>setFailed(true)}/>;
 }
 
