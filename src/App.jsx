@@ -970,10 +970,13 @@ function TimerPanel({books,onSaveSession}){
 // ══════════════════════════════════════════════════════════════
 // IMPORT PANEL (Notion CSV → JSON)
 // ══════════════════════════════════════════════════════════════
-function ImportPanel({onImport}){
+function ImportPanel({onImport, onTogglImport}){
   const [status, setStatus] = useState('idle'); // idle | parsing | done | error
+  const [togglStatus, setTogglStatus] = useState('idle');
   const [count, setCount] = useState(0);
+  const [togglCount, setTogglCount] = useState(0);
   const fileRef = useRef(null);
+  const togglRef = useRef(null);
 
   const parseCSV = (text) => {
     const lines = text.split(/\r?\n/);
@@ -1031,6 +1034,35 @@ function ImportPanel({onImport}){
   };
 
   const COLORS = ['#5bbfb5','#f5c842','#c4936a','#e07b7b','#8cba80','#a78bd4','#4a8fa8'];
+
+  const toMinutes = s => {
+    const p = (s||'').trim().split(':');
+    if(p.length===3) return parseInt(p[0])*60+parseInt(p[1])+Math.round(parseInt(p[2])/60);
+    return 0;
+  };
+
+  const handleTogglFile = async (file) => {
+    if(!file) return;
+    setTogglStatus('parsing');
+    try {
+      const text = await file.text();
+      const rows = parseCSV(text);
+      // rows: Project, Member, Email, Duration, Duration%
+      const sessions = rows
+        .filter(r => r['Project'] && r['Project'] !== 'Without project' && !r['Project'].startsWith('G検定') )
+        .map(r => ({
+          projectName: r['Project'].trim(),
+          totalMinutes: toMinutes(r['Duration']),
+        }))
+        .filter(s => s.totalMinutes > 0);
+      setTogglCount(sessions.length);
+      setTogglStatus('done');
+      onTogglImport(sessions);
+    } catch(e) {
+      console.error(e);
+      setTogglStatus('error');
+    }
+  };
 
   const handleFile = async (file) => {
     if(!file) return;
@@ -1108,24 +1140,41 @@ function ImportPanel({onImport}){
           <button className="btn btn-o" style={{marginTop:10}} onClick={()=>setStatus('idle')}>やり直す</button>
         </div>
       ) : (
-        <div className="import-drop"
-          onDrop={onDrop} onDragOver={e=>e.preventDefault()}
-          onClick={()=>fileRef.current?.click()}>
-          <input ref={fileRef} type="file" accept=".csv" style={{display:'none'}}
-            onChange={e=>handleFile(e.target.files[0])}/>
-          <div style={{fontSize:36,marginBottom:8}}>📂</div>
-          <div className="klee" style={{fontSize:14,color:'var(--mint)',fontWeight:600}}>CSVをドロップ or タップして選択</div>
-          <div style={{fontSize:10,color:'var(--ink3)',marginTop:4}}>Notion CSV（_all.csv推奨）</div>
+        <div>
+          {/* Notion CSV */}
+          <p className="klee" style={{fontSize:12,fontWeight:600,color:'var(--choco)',marginBottom:8}}>📚 Notion（本棚データ）</p>
+          <div className="import-drop"
+            onDrop={onDrop} onDragOver={e=>e.preventDefault()}
+            onClick={()=>fileRef.current?.click()}>
+            <input ref={fileRef} type="file" accept=".csv" style={{display:'none'}}
+              onChange={e=>handleFile(e.target.files[0])}/>
+            <div style={{fontSize:32,marginBottom:6}}>📂</div>
+            <div className="klee" style={{fontSize:13,color:'var(--mint)',fontWeight:600}}>CSVをドロップ or タップして選択</div>
+            <div style={{fontSize:10,color:'var(--ink3)',marginTop:3}}>KokuDoku Books の _all.csv</div>
+          </div>
+
+          {/* Toggl CSV */}
+          <p className="klee" style={{fontSize:12,fontWeight:600,color:'var(--choco)',margin:'16px 0 8px'}}>⏱ Toggl Track（読書時間）</p>
+          <div className="import-drop"
+            onDrop={e=>{e.preventDefault();handleTogglFile(e.dataTransfer.files[0]);}}
+            onDragOver={e=>e.preventDefault()}
+            onClick={()=>togglRef.current?.click()}>
+            <input ref={togglRef} type="file" accept=".csv" style={{display:'none'}}
+              onChange={e=>handleTogglFile(e.target.files[0])}/>
+            <div style={{fontSize:32,marginBottom:6}}>⏱</div>
+            <div className="klee" style={{fontSize:13,color:'var(--mint)',fontWeight:600}}>Toggl CSVをドロップ or タップして選択</div>
+            <div style={{fontSize:10,color:'var(--ink3)',marginTop:3}}>Reports → Summary → Download CSV</div>
+          </div>
         </div>
       )}
 
-      <div style={{marginTop:20,padding:'12px 16px',background:'var(--cream2)',borderRadius:10}}>
+      <div style={{marginTop:16,padding:'12px 16px',background:'var(--cream2)',borderRadius:10}}>
         <p className="klee" style={{fontSize:11,fontWeight:600,marginBottom:6}}>📖 インポートされるデータ</p>
         <div style={{fontSize:10,color:'var(--ink3)',lineHeight:1.8}}>
           ✓ タイトル・著者・ジャンル（タグ）<br/>
           ✓ 読了日・追加日・ステータス<br/>
           ✓ 表紙画像・ISBN・出版社<br/>
-          ✓ ハイライト件数（本文はKindleから別途取り込み）
+          ✓ Togglの読書時間（プロジェクト名で本と自動マッチング）
         </div>
       </div>
     </div>
@@ -1259,12 +1308,38 @@ export default function App(){
 
   const importBooks = (newBooks) => {
     setBooks(prev => {
-      // merge: skip duplicates by title
       const existing = new Set(prev.map(b=>b.title));
       const fresh = newBooks.filter(b => !existing.has(b.title));
       return [...fresh, ...prev];
     });
     setTab('shelf');
+  };
+
+  const importTogglSessions = (togglSessions) => {
+    // Match Toggl project names to books by title similarity
+    setBooks(prev => prev.map(book => {
+      const match = togglSessions.find(s => {
+        const tName = s.projectName.toLowerCase().replace(/\s/g,'');
+        const bName = book.title.toLowerCase().replace(/\s/g,'');
+        // exact or contains match
+        return tName === bName || bName.includes(tName) || tName.includes(bName.slice(0,6));
+      });
+      if(!match) return book;
+      // Convert total minutes to a single aggregate session
+      const alreadyHasToggl = book.sessions.some(s=>s.note==='Toggl');
+      if(alreadyHasToggl) return book;
+      const mins = match.totalMinutes;
+      const newSession = {
+        id: Date.now() + Math.random(),
+        date: book.endDate || book.startDate || todayStr(),
+        start: '00:00',
+        minutes: mins,
+        note: 'Toggl',
+      };
+      const newCur = Math.min(book.currentPage + Math.round(mins*1.2), book.totalPages||9999);
+      return {...book, sessions:[...book.sessions, newSession], currentPage:newCur};
+    }));
+    showToast(`⏱ Togglの読書時間を反映しました！`);
   };
 
   const addBook=data=>{
@@ -1338,7 +1413,7 @@ export default function App(){
           {tab==='log'&&<SessionLog books={books}/>}
           {tab==='hl'&&<HighlightPanel books={books} selectedId={selId} onSelectBook={setSelId} onAddHighlight={addHighlight}/>}
           {tab==='timer'&&<TimerPanel books={books} onSaveSession={saveSession}/>}
-          {tab==='import'&&<ImportPanel onImport={importBooks}/>}
+          {tab==='import'&&<ImportPanel onImport={importBooks} onTogglImport={importTogglSessions}/>}
         </div>
 
         {/* footer */}
