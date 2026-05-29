@@ -1286,7 +1286,7 @@ export default function App(){
         const sessions = sessionsRes.data || [];
         const highlights = highlightsRes.data || [];
         const merged = raw.map(b => ({
-          id: b.id,
+          id: String(b.id),
           title: b.title,
           author: b.author || '',
           genre: b.genre || '',
@@ -1424,7 +1424,7 @@ export default function App(){
     const {data}=await supabase.from('sessions').select('*');
     setBooks(prev=>prev.map(b=>({
       ...b,
-      sessions:(data||[]).filter(s=>s.book_id===String(b.id)).map(s=>({
+      sessions:(data||[]).filter(s=>String(s.book_id)===String(b.id)).map(s=>({
         id:s.id,date:s.date,start:s.start_time||'00:00',minutes:s.minutes||0,note:s.note||''
       }))
     })));
