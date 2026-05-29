@@ -683,13 +683,15 @@ function BookShelf({books,selectedId,onSelect,onEdit}){
                       </div>
                       <StatusBadge status={book.status}/>
                     </div>
-                    {book.status!=='want'&&(
+                    {(book.status!=='want' || totalMin>0)&&(
                       <div style={{marginTop:8}}>
                         <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-                          <span className="mono" style={{fontSize:9,color:'var(--ink3)'}}>{book.currentPage}/{book.totalPages}p</span>
-                          <span className="mono" style={{fontSize:9,color:'var(--ink3)'}}>{fmtM(totalMin)}</span>
+                          <span className="mono" style={{fontSize:9,color:'var(--ink3)'}}>
+                            {book.status!=='want'?`${book.currentPage}/${book.totalPages}p`:''}
+                          </span>
+                          <span className="mono" style={{fontSize:9,color:'var(--ink3)'}}>{totalMin>0?fmtM(totalMin):''}</span>
                         </div>
-                        <div className="pbar"><div className="pfill" style={{width:prog+'%',background:book.color}}/></div>
+                        {book.status!=='want'&&<div className="pbar"><div className="pfill" style={{width:prog+'%',background:book.color}}/></div>}
                       </div>
                     )}
                     <div style={{marginTop:6,display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
