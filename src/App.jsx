@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { supabase } from './supabase.js';
 
 const Fonts = () => (
   <style>{`
@@ -204,63 +205,7 @@ const monthStartOf = d => d.slice(0,7)+'-01';
 const COLORS = ['#7ec8c0','#f5c842','#c4936a','#e07b7b','#8cba80','#a78bd4','#4a8fa8'];
 
 // ── sample data ─────────────────────────────────────────────────
-const INIT_BOOKS = [
-  {
-    id:1, title:'動物たちは何をしゃべっているのか？', author:'山極寿一 / 鈴木俊貴',
-    coverUrl:'https://m.media-amazon.com/images/I/81nKb5MPVHL._AC_UF1000,1000_QL80_.jpg',
-    genre:'科学', status:'reading', totalPages:224, currentPage:120,
-    startDate:'2026-05-10', endDate:null, color:COLORS[0],
-    highlights:[
-      {id:1,text:'ゴリラの世界を知り、ゴリラになった山極さんだからこそ、人間社会に伝えたいことが山ほどあるに違いない。',color:'y',page:30,note:'研究者の視点'},
-      {id:2,text:'内心をうかがい知るのは難しい。',color:'p',page:47,note:''},
-      {id:3,text:'犬も、くっきりとした白目を持つ珍しい動物です。',color:'b',page:67,note:'人間との共進化'},
-    ],
-    sessions:[
-      {id:1,date:'2026-05-12',start:'21:00',minutes:45,note:''},
-      {id:2,date:'2026-05-14',start:'07:30',minutes:30,note:''},
-      {id:3,date:'2026-05-19',start:'21:00',minutes:60,note:''},
-      {id:4,date:'2026-05-21',start:'08:00',minutes:25,note:''},
-      {id:5,date:'2026-05-26',start:'21:30',minutes:50,note:''},
-      {id:6,date:'2026-05-28',start:'20:00',minutes:40,note:''},
-    ]
-  },
-  {
-    id:2, title:'創造的自己研究ハンドブック', author:'Maciej Karwowski',
-    coverUrl:'',
-    genre:'心理', status:'reading', totalPages:320, currentPage:80,
-    startDate:'2026-05-18', endDate:null, color:COLORS[1],
-    highlights:[
-      {id:1,text:'創造性は固定した才能ではなく、信念と思考様式によって形成される。',color:'y',page:22,note:''}
-    ],
-    sessions:[
-      {id:1,date:'2026-05-20',start:'14:00',minutes:29,note:''},
-      {id:2,date:'2026-05-25',start:'09:00',minutes:55,note:''},
-      {id:3,date:'2026-05-28',start:'10:00',minutes:30,note:''},
-    ]
-  },
-  {
-    id:3, title:'星の王子さま', author:'サン＝テグジュペリ',
-    coverUrl:'',
-    genre:'文学', status:'done', totalPages:136, currentPage:136,
-    startDate:'2026-05-01', endDate:'2026-05-16', color:COLORS[2],
-    highlights:[
-      {id:1,text:'大切なものは目に見えない。',color:'b',page:102,note:'キツネの言葉'}
-    ],
-    sessions:[
-      {id:1,date:'2026-05-01',start:'21:00',minutes:40,note:''},
-      {id:2,date:'2026-05-05',start:'20:30',minutes:55,note:''},
-      {id:3,date:'2026-05-10',start:'22:00',minutes:41,note:''},
-      {id:4,date:'2026-05-16',start:'20:00',minutes:60,note:'読了！'},
-    ]
-  },
-  {
-    id:4, title:'嫌われる勇気', author:'岸見一郎 / 古賀史健',
-    coverUrl:'',
-    genre:'哲学', status:'want', totalPages:296, currentPage:0,
-    startDate:null, endDate:null, color:COLORS[3],
-    highlights:[], sessions:[]
-  },
-];
+const INIT_BOOKS = [];
 
 // ── StatusBadge ─────────────────────────────────────────────────
 function StatusBadge({status}){
@@ -1298,79 +1243,189 @@ function AddBookModal({onAdd,onClose,editBook}){
 // ══════════════════════════════════════════════════════════════
 export default function App(){
   const [tab,setTab]=useState('shelf');
-  const [books,setBooks]=useState(INIT_BOOKS);
-  const [selId,setSelId]=useState(INIT_BOOKS[0].id);
+  const [books,setBooks]=useState([]);
+  const [selId,setSelId]=useState(null);
   const [showAdd,setShowAdd]=useState(false);
   const [editBook,setEditBook]=useState(null);
   const [toast,setToast]=useState(null);
+  const [loading,setLoading]=useState(true);
 
   const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(null),2200)};
 
-  const importBooks = (newBooks) => {
-    setBooks(prev => {
-      const existing = new Set(prev.map(b=>b.title));
-      const fresh = newBooks.filter(b => !existing.has(b.title));
-      return [...fresh, ...prev];
-    });
-    setTab('shelf');
+  // ── Supabase: load all data ──────────────────────────────────
+  useEffect(()=>{
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const [booksRes, sessionsRes, highlightsRes] = await Promise.all([
+          supabase.from('books').select('*').order('created_at', {ascending:false}),
+          supabase.from('sessions').select('*'),
+          supabase.from('highlights').select('*'),
+        ]);
+        if(booksRes.error) throw booksRes.error;
+        const raw = booksRes.data || [];
+        const sessions = sessionsRes.data || [];
+        const highlights = highlightsRes.data || [];
+        const merged = raw.map(b => ({
+          id: b.id,
+          title: b.title,
+          author: b.author || '',
+          genre: b.genre || '',
+          status: b.status || 'want',
+          totalPages: b.total_pages || 0,
+          currentPage: b.current_page || 0,
+          startDate: b.start_date,
+          endDate: b.end_date,
+          coverUrl: b.cover_url || '',
+          color: b.color || '#5bbfb5',
+          isbn: b.isbn || '',
+          publisher: b.publisher || '',
+          highlightCount: b.highlight_count || 0,
+          notionUrl: b.notion_url || '',
+          product: b.product || '',
+          sessions: sessions.filter(s=>s.book_id===b.id).map(s=>({
+            id: s.id, date: s.date, start: s.start_time||'00:00',
+            minutes: s.minutes||0, note: s.note||''
+          })),
+          highlights: highlights.filter(h=>h.book_id===b.id).map(h=>({
+            id: h.id, text: h.text, color: h.color||'y',
+            page: h.page, note: h.note||''
+          })),
+        }));
+        setBooks(merged);
+        if(merged.length > 0) setSelId(merged[0].id);
+      } catch(e) {
+        console.error('Load error:', e);
+        showToast('データの読み込みに失敗しました');
+      }
+      setLoading(false);
+    };
+    loadData();
+  }, []);
+
+  // ── Supabase: save / update book ────────────────────────────
+  const upsertBook = async (book) => {
+    const row = {
+      id: String(book.id), title: book.title, author: book.author||'', genre: book.genre||'',
+      status: book.status, total_pages: book.totalPages||0, current_page: book.currentPage||0,
+      start_date: book.startDate||null, end_date: book.endDate||null,
+      cover_url: book.coverUrl||'', color: book.color||'#5bbfb5',
+      isbn: book.isbn||'', publisher: book.publisher||'',
+      highlight_count: book.highlightCount||0,
+      notion_url: book.notionUrl||'', product: book.product||'',
+      updated_at: new Date().toISOString(),
+    };
+    const {error} = await supabase.from('books').upsert(row);
+    if(error) console.error('upsert error:', error);
   };
 
-  const importTogglSessions = (togglSessions) => {
-    // Match Toggl project names to books by title similarity
-    setBooks(prev => prev.map(book => {
-      const match = togglSessions.find(s => {
-        const tName = s.projectName.toLowerCase().replace(/\s/g,'');
-        const bName = book.title.toLowerCase().replace(/\s/g,'');
-        // exact or contains match
-        return tName === bName || bName.includes(tName) || tName.includes(bName.slice(0,6));
-      });
-      if(!match) return book;
-      // Convert total minutes to a single aggregate session
-      const alreadyHasToggl = book.sessions.some(s=>s.note==='Toggl');
-      if(alreadyHasToggl) return book;
-      const mins = match.totalMinutes;
-      const newSession = {
-        id: Date.now() + Math.random(),
-        date: book.endDate || book.startDate || todayStr(),
-        start: '00:00',
-        minutes: mins,
-        note: 'Toggl',
-      };
-      const newCur = Math.min(book.currentPage + Math.round(mins*1.2), book.totalPages||9999);
-      return {...book, sessions:[...book.sessions, newSession], currentPage:newCur};
+  const importBooks = async (newBooks) => {
+    const existing = new Set(books.map(b=>b.title));
+    const fresh = newBooks.filter(b => !existing.has(b.title));
+    if(fresh.length===0){ showToast('新しい本はありませんでした'); return; }
+    const rows = fresh.map(b=>({
+      id: String(b.id), title: b.title, author: b.author||'', genre: b.genre||'',
+      status: b.status||'want', total_pages: b.totalPages||0, current_page: 0,
+      start_date: b.startDate||null, end_date: b.endDate||null,
+      cover_url: b.coverUrl||'', color: b.color||'#5bbfb5',
+      isbn: b.isbn||'', publisher: b.publisher||'',
+      highlight_count: b.highlightCount||0,
+      notion_url: b.notionUrl||'', product: b.product||'',
     }));
-    showToast(`⏱ Togglの読書時間を反映しました！`);
+    const CHUNK=50;
+    for(let i=0;i<rows.length;i+=CHUNK){
+      const {error}=await supabase.from('books').upsert(rows.slice(i,i+CHUNK));
+      if(error) console.error('import error:',error);
+    }
+    setBooks(prev=>[...fresh.map(b=>({...b,sessions:[],highlights:[]})),...prev]);
+    setTab('shelf');
+    showToast(`📚 ${fresh.length}冊インポートしました！`);
   };
 
-  const addBook=data=>{
-    if(data.id){
-      setBooks(bs=>bs.map(b=>b.id===data.id?{...b,...data}:b));
+  const importTogglSessions = async (togglSessions) => {
+    let matched=0;
+    for(const book of books){
+      const match=togglSessions.find(s=>{
+        const tName=s.projectName.toLowerCase().replace(/\s+/g,'');
+        const bName=book.title.toLowerCase().replace(/\s+/g,'');
+        return tName===bName||bName.includes(tName)||tName.includes(bName.slice(0,6));
+      });
+      if(!match) continue;
+      if(book.sessions.some(s=>s.note==='Toggl')) continue;
+      const sessionRow={
+        id:'toggl-'+book.id, book_id:String(book.id),
+        date:book.endDate||book.startDate||todayStr(),
+        start_time:'00:00', minutes:match.totalMinutes, note:'Toggl',
+      };
+      await supabase.from('sessions').upsert(sessionRow);
+      matched++;
+    }
+    const {data}=await supabase.from('sessions').select('*');
+    setBooks(prev=>prev.map(b=>({
+      ...b,
+      sessions:(data||[]).filter(s=>s.book_id===String(b.id)).map(s=>({
+        id:s.id,date:s.date,start:s.start_time||'00:00',minutes:s.minutes||0,note:s.note||''
+      }))
+    })));
+    showToast(`⏱ ${matched}冊の読書時間を反映しました！`);
+  };
+
+  const addBook = async (data) => {
+    const isEdit = !!data.id;
+    const id = isEdit ? String(data.id) : String(Date.now());
+    const book = {...data, id, highlights:data.highlights||[], sessions:data.sessions||[]};
+    await upsertBook(book);
+    if(isEdit){
+      setBooks(bs=>bs.map(b=>b.id===id?{...b,...book}:b));
       showToast('✅ 更新しました！');
     } else {
-      const nb={...data,id:Date.now(),highlights:[],sessions:[]};
-      setBooks(bs=>[nb,...bs]);
-      setSelId(nb.id);
+      setBooks(bs=>[{...book,highlights:[],sessions:[]},...bs]);
+      setSelId(id);
       showToast('📚 本を追加しました！');
     }
-    setShowAdd(false);setEditBook(null);
+    setShowAdd(false); setEditBook(null);
   };
 
-  const addHighlight=(bookId,hl)=>{
-    setBooks(bs=>bs.map(b=>b.id===bookId?{...b,highlights:[...b.highlights,{...hl,id:Date.now()}]}:b));
-    showToast('✨ ハイライトを追加！');
+  const addHighlight = async (bookId, hl) => {
+    const row={
+      id:String(Date.now()), book_id:String(bookId),
+      text:hl.text, color:hl.color||'y',
+      page:hl.page?String(hl.page):null, note:hl.note||'',
+    };
+    await supabase.from('highlights').insert(row);
+    setBooks(bs=>bs.map(b=>b.id===bookId?{...b,highlights:[...b.highlights,{...row}]}:b));
+    showToast('✨ ハイライトを追加しました！');
   };
 
-  const saveSession=(bookId,minutes,start)=>{
+  const saveSession = async (bookId, minutes, start) => {
+    const row={
+      id:String(Date.now()), book_id:String(bookId),
+      date:todayStr(), start_time:start||'--:--', minutes, note:'',
+    };
+    await supabase.from('sessions').insert(row);
     setBooks(bs=>bs.map(b=>{
-      if(b.id!==bookId)return b;
-      const newCur=Math.min(b.currentPage+Math.round(minutes*1.2),b.totalPages);
-      const prog=b.totalPages?Math.round(newCur/b.totalPages*100):0;
-      return{...b,sessions:[...b.sessions,{id:Date.now(),date:todayStr(),start:start||'--:--',minutes,note:''}],currentPage:newCur,progress:prog};
+      if(b.id!==bookId) return b;
+      const newCur=Math.min(b.currentPage+Math.round(minutes*1.2),b.totalPages||9999);
+      return{...b,sessions:[...b.sessions,{id:row.id,date:row.date,start:row.start_time,minutes,note:''}],currentPage:newCur};
     }));
+    await supabase.from('books').update({current_page:Math.min((books.find(b=>b.id===bookId)?.currentPage||0)+Math.round(minutes*1.2),books.find(b=>b.id===bookId)?.totalPages||9999)}).eq('id',String(bookId));
     showToast(`🎉 ${fmtM(minutes)}記録したよ！`);
   };
 
   const TABS=[['shelf','📚 本棚'],['calendar','📅 カレンダー'],['log','📋 ログ'],['hl','✨ ハイライト'],['timer','⏱ タイマー'],['import','📥 取込']];
+  if(loading) return(
+    <>
+      <Fonts/>
+      <div style={{height:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'var(--cream)',gap:16}}>
+        <div style={{fontSize:48}}>📚</div>
+        <div className="klee" style={{fontSize:16,color:'var(--mint)'}}>読書録を読み込み中…</div>
+        <div style={{width:120,height:4,background:'var(--mint-light)',borderRadius:99,overflow:'hidden'}}>
+          <div style={{height:'100%',background:'var(--mint)',borderRadius:99,animation:'loading 1.2s ease-in-out infinite'}}/>
+        </div>
+        <style>{`@keyframes loading{0%{width:0%}50%{width:80%}100%{width:100%}}`}</style>
+      </div>
+    </>
+  );
   const today=todayStr();
   const totalAll=books.flatMap(b=>b.sessions).reduce((a,s)=>a+s.minutes,0);
 
