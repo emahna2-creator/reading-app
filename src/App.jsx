@@ -1302,7 +1302,7 @@ export default function App(){
           highlightCount: b.highlight_count || 0,
           notionUrl: b.notion_url || '',
           product: b.product || '',
-          sessions: sessions.filter(s=>s.book_id===b.id).map(s=>({
+          sessions: sessions.filter(s=>String(s.book_id)===String(b.id)).map(s=>({
             id: s.id, date: s.date, start: s.start_time||'00:00',
             minutes: s.minutes||0, note: s.note||''
           })),
@@ -1363,11 +1363,19 @@ export default function App(){
 
   const importTogglSessions = async (togglSessions, isDetailed=false) => {
     const matchBook = (projectName) => {
-      const tName = projectName.toLowerCase().replace(/\s+/g,'');
-      return books.find(book => {
-        const bName = book.title.toLowerCase().replace(/\s+/g,'');
-        return tName===bName || bName.includes(tName) || tName.includes(bName.slice(0,8));
+      const tName = projectName.toLowerCase().replace(/[\s　]/g,'');
+      // 1. exact match first
+      let found = books.find(b => b.title.toLowerCase().replace(/[\s　]/g,'') === tName);
+      if(found) return found;
+      // 2. book title starts with toggl name (toggl is abbreviated title)
+      found = books.find(b => b.title.toLowerCase().replace(/[\s　]/g,'').startsWith(tName));
+      if(found) return found;
+      // 3. toggl name starts with book title (book title is shorter) — only if book title >= 8 chars
+      found = books.find(b => {
+        const bName = b.title.toLowerCase().replace(/[\s　]/g,'');
+        return bName.length >= 8 && tName.startsWith(bName);
       });
+      return found || null;
     };
 
     let matched=0;
