@@ -1,0 +1,142 @@
+diff --git a/src/App.jsx b/src/App.jsx
+index 7b59a42..6fd80b5 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -604,6 +604,8 @@ function SessionLog({books}){
+ function BookShelf({books,selectedId,onSelect,onEdit}){
+   const [filter,setFilter]=useState('all');
+   const [viewMode,setViewMode]=useState('list'); // list | gallery
++  const [sortKey,setSortKey]=useState('added');   // added | title | readtime | progress | updated
++  const [sortDir,setSortDir]=useState('desc');
+   const today=todayStr();
+   const ym=today.slice(0,7);
+ 
+@@ -613,9 +615,31 @@ function BookShelf({books,selectedId,onSelect,onEdit}){
+     return books.filter(b=>b.status===filter);
+   })();
+ 
++  const sorted=[...filtered].sort((a,b)=>{
++    let v=0;
++    if(sortKey==='title')    v=a.title.localeCompare(b.title,'ja');
++    if(sortKey==='readtime') v=a.sessions.reduce((s,r)=>s+r.minutes,0)-b.sessions.reduce((s,r)=>s+r.minutes,0);
++    if(sortKey==='progress'){
++      const pa=a.totalPages?a.currentPage/a.totalPages:0;
++      const pb=b.totalPages?b.currentPage/b.totalPages:0;
++      v=pa-pb;
++    }
++    if(sortKey==='updated'){
++      const la=a.sessions.length?[...a.sessions].sort((x,y)=>y.date.localeCompare(x.date))[0].date:'0000';
++      const lb=b.sessions.length?[...b.sessions].sort((x,y)=>y.date.localeCompare(x.date))[0].date:'0000';
++      v=la.localeCompare(lb);
++    }
++    // 'added' = デフォルト（配列順 = Supabase created_at desc）
++    return sortDir==='desc'?-v:v;
++  });
++
++  const SORT_OPTIONS=[
++    ['added','登録順'],['updated','最終読書'],['readtime','読書時間'],['progress','進捗率'],['title','タイトル'],
++  ];
++
+   return(
+     <div>
+-      <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
++      <div style={{display:'flex',gap:6,marginBottom:8,flexWrap:'wrap',alignItems:'center'}}>
+         <div style={{display:'flex',gap:4,flex:1,flexWrap:'wrap'}}>
+           {[['all','すべて'],['reading','読中'],['done','読了'],['want','積読'],['this-month','今月読んだ']].map(([v,l])=>(
+             <button key={v} onClick={()=>{setFilter(v);if(v==='this-month')setViewMode('gallery');}}
+@@ -638,6 +662,22 @@ function BookShelf({books,selectedId,onSelect,onEdit}){
+         </div>
+       </div>
+ 
++      {/* ソートバー */}
++      <div style={{display:'flex',gap:4,marginBottom:12,alignItems:'center',flexWrap:'wrap'}}>
++        <span style={{fontSize:9,color:'var(--ink3)',fontFamily:'Klee One',flexShrink:0}}>並び替え:</span>
++        {SORT_OPTIONS.map(([k,l])=>(
++          <button key={k}
++            onClick={()=>{ if(sortKey===k) setSortDir(d=>d==='desc'?'asc':'desc'); else { setSortKey(k); setSortDir('desc'); }}}
++            style={{fontSize:9,padding:'3px 8px',cursor:'pointer',fontFamily:'Klee One',borderRadius:6,
++              background:sortKey===k?'var(--mint-pale)':'transparent',
++              color:sortKey===k?'var(--mint)':'var(--ink3)',
++              border:sortKey===k?'1.5px solid var(--mint-light)':'1px solid transparent',
++              display:'flex',alignItems:'center',gap:2}}>
++            {l}{sortKey===k&&<span style={{fontSize:9}}>{sortDir==='desc'?'↓':'↑'}</span>}
++          </button>
++        ))}
++      </div>
++
+       {/* gallery mode */}
+       {viewMode==='gallery'&&(
+         <div>
+@@ -645,7 +685,7 @@ function BookShelf({books,selectedId,onSelect,onEdit}){
+             {filter==='this-month'?`📖 ${today.slice(0,7).replace('-','年')}月に読んだ本`:'📚 表紙一覧'}
+           </p>
+           <div className="cover-gallery">
+-            {filtered.map(book=>(
++            {sorted.map(book=>(
+               <div key={book.id} className="gallery-item fin" onClick={()=>onSelect(book.id)}>
+                 <BookCover book={book} width={80} height={112} radius={8}/>
+                 <div style={{textAlign:'center',maxWidth:80}}>
+@@ -667,7 +707,7 @@ function BookShelf({books,selectedId,onSelect,onEdit}){
+       {/* list mode */}
+       {viewMode==='list'&&(
+         <div style={{display:'flex',flexDirection:'column',gap:8}}>
+-          {filtered.map(book=>{
++          {sorted.map(book=>{
+             const totalMin=book.sessions.reduce((a,s)=>a+s.minutes,0);
+             const prog=book.totalPages?Math.round(book.currentPage/book.totalPages*100):0;
+             return(
+@@ -983,8 +1023,9 @@ function ImportPanel({onImport, onTogglImport}){
+   const COLORS = ['#5bbfb5','#f5c842','#c4936a','#e07b7b','#8cba80','#a78bd4','#4a8fa8'];
+ 
+   const toMinutes = s => {
+-    const p = (s||'').trim().split(':');
+-    if(p.length>=2) return parseInt(p[0])*60+parseInt(p[1]);
++    const p = (s||'').trim().split(':').map(Number);
++    if(p.length>=3) return Math.round(p[0]*60 + p[1] + p[2]/60); // HH:MM:SS → 秒を分に丸め込む
++    if(p.length===2) return p[0]*60 + p[1]; // HH:MM
+     return 0;
+   };
+ 
+@@ -1364,18 +1405,34 @@ export default function App(){
+   };
+ 
+   const importTogglSessions = async (togglSessions, isDetailed=false) => {
++    // プロジェクト名を正規化（スペース・括弧・記号・「」を除去して小文字に）
++    const normalize = str =>
++      str.toLowerCase()
++        .replace(/[「」『』【】［］\[\]()（）《》〈〉]/g,'')  // 括弧類
++        .replace(/[・：:\/／]/g,'')                          // 区切り記号
++        .replace(/[　\s]+/g,'');                             // スペース全角半角
++
+     const matchBook = (projectName) => {
+-      const tName = projectName.toLowerCase().replace(/[\s　]/g,'');
+-      // 1. exact match first
+-      let found = books.find(b => b.title.toLowerCase().replace(/[\s　]/g,'') === tName);
++      const tName = normalize(projectName);
++      // 1. 完全一致
++      let found = books.find(b => normalize(b.title) === tName);
++      if(found) return found;
++      // 2. 本のタイトルがToggl名で始まる（Toggl側が省略タイトル）
++      found = books.find(b => normalize(b.title).startsWith(tName) && tName.length >= 4);
++      if(found) return found;
++      // 3. Toggl名が本のタイトルで始まる（本タイトルが短い）
++      found = books.find(b => {
++        const bName = normalize(b.title);
++        return bName.length >= 6 && tName.startsWith(bName);
++      });
+       if(found) return found;
+-      // 2. book title starts with toggl name (toggl is abbreviated title)
+-      found = books.find(b => b.title.toLowerCase().replace(/[\s　]/g,'').startsWith(tName));
++      // 4. 本のタイトルにToggl名が含まれる（中間一致）
++      found = books.find(b => tName.length >= 6 && normalize(b.title).includes(tName));
+       if(found) return found;
+-      // 3. toggl name starts with book title (book title is shorter) — only if book title >= 8 chars
++      // 5. Toggl名に本のタイトルが含まれる（逆包含）
+       found = books.find(b => {
+-        const bName = b.title.toLowerCase().replace(/[\s　]/g,'');
+-        return bName.length >= 8 && tName.startsWith(bName);
++        const bName = normalize(b.title);
++        return bName.length >= 6 && tName.includes(bName);
+       });
+       return found || null;
+     };
