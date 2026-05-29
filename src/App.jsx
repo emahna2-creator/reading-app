@@ -982,7 +982,7 @@ function ImportPanel({onImport, onTogglImport}){
 
   const toMinutes = s => {
     const p = (s||'').trim().split(':');
-    if(p.length===3) return parseInt(p[0])*60+parseInt(p[1])+Math.round(parseInt(p[2])/60);
+    if(p.length>=2) return parseInt(p[0])*60+parseInt(p[1]);
     return 0;
   };
 
@@ -992,17 +992,36 @@ function ImportPanel({onImport, onTogglImport}){
     try {
       const text = await file.text();
       const rows = parseCSV(text);
-      // rows: Project, Member, Email, Duration, Duration%
-      const sessions = rows
-        .filter(r => r['Project'] && r['Project'] !== 'Without project' && !r['Project'].startsWith('G検定') )
-        .map(r => ({
-          projectName: r['Project'].trim(),
-          totalMinutes: toMinutes(r['Duration']),
-        }))
-        .filter(s => s.totalMinutes > 0);
-      setTogglCount(sessions.length);
-      setTogglStatus('done');
-      onTogglImport(sessions);
+
+      // Detect format: Detailed has "Start date", Summary has "Duration %"
+      const isDetailed = rows[0] && ('Start date' in rows[0] || 'Start time' in rows[0]);
+
+      if(isDetailed){
+        // Detailed CSV: 1 row = 1 session with date/time
+        const sessions = rows
+          .filter(r => r['Project'] && r['Project'] !== 'Without project' && !r['Project'].startsWith('G検定'))
+          .map(r => {
+            const mins = toMinutes(r['Duration']);
+            // Start date may include time: "2026-05-28 21:39:14" or separate columns
+            const startRaw = r['Start date'] || '';
+            const date = startRaw.length >= 10 ? startRaw.slice(0,10) : '';
+            const startTime = startRaw.length > 10 ? startRaw.slice(11,16) : (r['Start time']||'').slice(0,5);
+            return { projectName: r['Project'].trim(), date, start: startTime, minutes: mins };
+          })
+          .filter(s => s.minutes >= 1 && s.date);
+        setTogglCount(sessions.length);
+        setTogglStatus('done');
+        onTogglImport(sessions, true); // true = detailed
+      } else {
+        // Summary CSV: 1 row = total per project
+        const sessions = rows
+          .filter(r => r['Project'] && r['Project'] !== 'Without project' && !r['Project'].startsWith('G検定'))
+          .map(r => ({ projectName: r['Project'].trim(), totalMinutes: toMinutes(r['Duration']) }))
+          .filter(s => s.totalMinutes > 0);
+        setTogglCount(sessions.length);
+        setTogglStatus('done');
+        onTogglImport(sessions, false); // false = summary
+      }
     } catch(e) {
       console.error(e);
       setTogglStatus('error');
@@ -1342,24 +1361,58 @@ export default function App(){
     showToast(`📚 ${fresh.length}冊インポートしました！`);
   };
 
-  const importTogglSessions = async (togglSessions) => {
-    let matched=0;
-    for(const book of books){
-      const match=togglSessions.find(s=>{
-        const tName=s.projectName.toLowerCase().replace(/\s+/g,'');
-        const bName=book.title.toLowerCase().replace(/\s+/g,'');
-        return tName===bName||bName.includes(tName)||tName.includes(bName.slice(0,6));
+  const importTogglSessions = async (togglSessions, isDetailed=false) => {
+    const matchBook = (projectName) => {
+      const tName = projectName.toLowerCase().replace(/\s+/g,'');
+      return books.find(book => {
+        const bName = book.title.toLowerCase().replace(/\s+/g,'');
+        return tName===bName || bName.includes(tName) || tName.includes(bName.slice(0,8));
       });
-      if(!match) continue;
-      if(book.sessions.some(s=>s.note==='Toggl')) continue;
-      const sessionRow={
-        id:'toggl-'+book.id, book_id:String(book.id),
-        date:book.endDate||book.startDate||todayStr(),
-        start_time:'00:00', minutes:match.totalMinutes, note:'Toggl',
-      };
-      await supabase.from('sessions').upsert(sessionRow);
-      matched++;
+    };
+
+    let matched=0;
+    const rows = [];
+
+    if(isDetailed){
+      // Each togglSession = {projectName, date, start, minutes}
+      // Group by book, skip already-imported (check by id prefix)
+      const existingIds = new Set(books.flatMap(b=>b.sessions.map(s=>s.id)));
+      for(let i=0; i<togglSessions.length; i++){
+        const s = togglSessions[i];
+        const book = matchBook(s.projectName);
+        if(!book) continue;
+        const id = `toggl-${book.id}-${s.date}-${i}`;
+        if(existingIds.has(id)) continue;
+        rows.push({
+          id, book_id:String(book.id),
+          date:s.date, start_time:s.start||'00:00',
+          minutes:s.minutes, note:'Toggl',
+        });
+        matched++;
+      }
+    } else {
+      // Summary: one session per book with total minutes
+      for(const s of togglSessions){
+        const book = matchBook(s.projectName);
+        if(!book) continue;
+        if(book.sessions.some(s=>s.note==='Toggl')) continue;
+        rows.push({
+          id:'toggl-'+book.id, book_id:String(book.id),
+          date:book.endDate||book.startDate||todayStr(),
+          start_time:'00:00', minutes:s.totalMinutes, note:'Toggl',
+        });
+        matched++;
+      }
     }
+
+    // Batch insert to Supabase
+    const CHUNK=50;
+    for(let i=0;i<rows.length;i+=CHUNK){
+      const {error}=await supabase.from('sessions').upsert(rows.slice(i,i+CHUNK));
+      if(error) console.error('toggl insert error:',error);
+    }
+
+    // Reload sessions
     const {data}=await supabase.from('sessions').select('*');
     setBooks(prev=>prev.map(b=>({
       ...b,
@@ -1367,7 +1420,7 @@ export default function App(){
         id:s.id,date:s.date,start:s.start_time||'00:00',minutes:s.minutes||0,note:s.note||''
       }))
     })));
-    showToast(`⏱ ${matched}冊の読書時間を反映しました！`);
+    showToast(`⏱ ${matched}件のセッションを反映しました！`);
   };
 
   const addBook = async (data) => {
