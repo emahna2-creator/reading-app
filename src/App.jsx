@@ -1430,7 +1430,7 @@ export default function App(){
       try {
         const [booksRes, sessionsRes, highlightsRes] = await Promise.all([
           supabase.from('books').select('*').order('created_at', {ascending:false}),
-          supabase.from('sessions').select('*'),
+          supabase.from('sessions').select('*').limit(10000),
           supabase.from('highlights').select('*'),
         ]);
         if(booksRes.error) throw booksRes.error;
@@ -1607,7 +1607,7 @@ export default function App(){
     console.log(`✅ insert完了: 成功${insertOk}件 失敗${insertFail}件`);
 
     // Reload sessions
-    const {data}=await supabase.from('sessions').select('*');
+    const {data}=await supabase.from('sessions').select('*').limit(10000);
     setBooks(prev=>prev.map(b=>({
       ...b,
       sessions:(data||[]).filter(s=>String(s.book_id)===String(b.id)).map(s=>({
