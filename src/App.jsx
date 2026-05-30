@@ -1595,11 +1595,16 @@ export default function App(){
     }
 
     // Batch insert to Supabase
+    console.log('💾 挿入対象:', rows.length, '件, 先頭サンプル:', rows[0]);
     const CHUNK=50;
+    let insertOk=0, insertFail=0;
     for(let i=0;i<rows.length;i+=CHUNK){
-      const {error}=await supabase.from('sessions').upsert(rows.slice(i,i+CHUNK));
-      if(error) console.error('toggl insert error:',error);
+      const chunk=rows.slice(i,i+CHUNK);
+      const {data:insertData, error}=await supabase.from('sessions').upsert(chunk,{onConflict:'id'});
+      if(error){ console.error('❌ toggl insert error:', error, '| サンプル行:', chunk[0]); insertFail+=chunk.length; }
+      else { insertOk+=chunk.length; }
     }
+    console.log(`✅ insert完了: 成功${insertOk}件 失敗${insertFail}件`);
 
     // Reload sessions
     const {data}=await supabase.from('sessions').select('*');
