@@ -1430,7 +1430,16 @@ export default function App(){
       try {
         const [booksRes, sessionsRes, highlightsRes] = await Promise.all([
           supabase.from('books').select('*').order('created_at', {ascending:false}),
-          supabase.from('sessions').select('*').limit(10000),
+          (async()=>{
+            const PAGE=1000;
+            let all=[], from=0, done=false;
+            while(!done){
+              const {data,error}=await supabase.from('sessions').select('*').range(from,from+PAGE-1);
+              if(error||!data||data.length===0) done=true;
+              else{ all=[...all,...data]; from+=PAGE; if(data.length<PAGE) done=true; }
+            }
+            return {data:all,error:null};
+          })(),
           supabase.from('highlights').select('*'),
         ]);
         if(booksRes.error) throw booksRes.error;
@@ -1607,7 +1616,14 @@ export default function App(){
     console.log(`✅ insert完了: 成功${insertOk}件 失敗${insertFail}件`);
 
     // Reload sessions
-    const {data}=await supabase.from('sessions').select('*').limit(10000);
+    // 全件ページネーション取得
+    let allSessions=[], sfrom=0, sdone=false;
+    while(!sdone){
+      const {data:sd}=await supabase.from('sessions').select('*').range(sfrom,sfrom+999);
+      if(!sd||sd.length===0) sdone=true;
+      else{ allSessions=[...allSessions,...sd]; sfrom+=1000; if(sd.length<1000) sdone=true; }
+    }
+    const data=allSessions;
     setBooks(prev=>prev.map(b=>({
       ...b,
       sessions:(data||[]).filter(s=>String(s.book_id)===String(b.id)).map(s=>({
