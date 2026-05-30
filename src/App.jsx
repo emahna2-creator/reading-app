@@ -334,8 +334,9 @@ function MonthlyCalendar({books}){
   const today = todayStr();
 
   const dim = new Date(year, month+1, 0).getDate();
-  const firstDow = new Date(year, month, 1).getDay();
+  const firstDow = new Date(year, month, 1).getDay(); // 0=日
 
+  // カレンダーのセル（週ごとに分割）
   const cells = [];
   for(let i=0;i<firstDow;i++) cells.push({d:null});
   for(let d=1;d<=dim;d++) cells.push({d});
@@ -357,31 +358,7 @@ function MonthlyCalendar({books}){
   // 月集計
   const monthSessions=Object.entries(sessionMap).filter(([d])=>d.startsWith(ym));
   const monthTotal=monthSessions.reduce((a,[,v])=>a+v.reduce((x,s)=>x+s.minutes,0),0);
-  const monthDays=monthSessions.length;
-
-  // この月に読んでいる本（セッションがある本）のリスト（バー用）
-  const activeBooks = books.filter(b=>b.sessions.some(s=>s.date.startsWith(ym)));
-
-  // 本ごとに「この月のセッションがある日のSet」と「読了日」を計算
-  const bookMeta = {};
-  activeBooks.forEach(b=>{
-    const sessionDates = new Set(b.sessions.filter(s=>s.date.startsWith(ym)).map(s=>s.date));
-    bookMeta[b.id]={
-      color: b.color,
-      title: b.title,
-      sessionDates,
-      endDate: b.endDate,  // 読了日（Notion由来）
-    };
-  });
-
-  // バー行の順番（本の並び順を固定: 最初のセッション日が早い順）
-  const barOrder = activeBooks
-    .map(b=>({
-      id:b.id,
-      firstSession: [...bookMeta[b.id].sessionDates].sort()[0]||'9999',
-    }))
-    .sort((a,b)=>a.firstSession.localeCompare(b.firstSession))
-    .map(b=>b.id);
+  const monthDays=new Set(monthSessions.map(([d])=>d)).size;
 
   // 週合計
   const weekTotal=(wk)=>{
@@ -394,6 +371,41 @@ function MonthlyCalendar({books}){
     return tot;
   };
 
+  // 週ごとに「登場する本のレーン」を計算
+  // 週内にセッションがある本 → 実線、週内で前後にセッションがあるのに当日なし → 点線
+  const buildWeekLanes=(wk)=>{
+    // この週に1度でも登場した本を順序保持で収集
+    const bookIds=[];
+    const seen=new Set();
+    wk.forEach(c=>{
+      if(!c.d) return;
+      const ds=`${year}-${pad(month+1)}-${pad(c.d)}`;
+      (sessionMap[ds]||[]).forEach(s=>{
+        if(!seen.has(s.bookId)){ seen.add(s.bookId); bookIds.push(s.bookId); }
+      });
+    });
+
+    // 各本の週内の「最初・最後のセッション日インデックス」を計算
+    const bookInfo={};
+    bookIds.forEach(id=>{
+      const b=books.find(b=>b.id===id);
+      if(!b) return;
+      let first=-1, last=-1;
+      const sessionDays=new Set();
+      wk.forEach((c,ci)=>{
+        if(!c.d) return;
+        const ds=`${year}-${pad(month+1)}-${pad(c.d)}`;
+        const has=(sessionMap[ds]||[]).some(s=>s.bookId===id);
+        if(has){ sessionDays.add(ci); if(first===-1)first=ci; last=ci; }
+      });
+      bookInfo[id]={
+        color:b.color, title:b.title, endDate:b.endDate,
+        first, last, sessionDays,
+      };
+    });
+    return {bookIds, bookInfo};
+  };
+
   const DOW=['日','月','火','水','木','金','土'];
   const prev=()=>{ if(month===0){setYear(y=>y-1);setMonth(11);}else setMonth(m=>m-1); };
   const next=()=>{ if(month===11){setYear(y=>y+1);setMonth(0);}else setMonth(m=>m+1); };
@@ -401,7 +413,8 @@ function MonthlyCalendar({books}){
   return(
     <div>
       {/* ヘッダー */}
-      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}>        <button onClick={prev} style={{background:'none',border:'none',fontSize:20,cursor:'pointer',color:'var(--choco-soft)'}}>‹</button>
+      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}>
+        <button onClick={prev} style={{background:'none',border:'none',fontSize:20,cursor:'pointer',color:'var(--choco-soft)'}}>‹</button>
         <div>
           <span className="klee" style={{fontSize:24,fontWeight:600,color:'var(--choco)'}}>{year}年</span>
           <span className="klee" style={{fontSize:18,color:'var(--mint)',marginLeft:8}}>{month+1}月</span>
@@ -421,129 +434,161 @@ function MonthlyCalendar({books}){
 
       {/* カレンダー本体 */}
       <div className="cal-wrap">
+        {/* 曜日ヘッダー */}
         <div className="cal-header-row">
           <div style={{background:'var(--choco)',borderRight:'1px solid rgba(255,255,255,.15)',display:'flex',alignItems:'center',justifyContent:'center'}}>
             <span style={{fontSize:9,color:'rgba(255,255,255,.5)',fontFamily:'DM Mono'}}>週計</span>
           </div>
           {DOW.map((d,i)=>(
             <div key={d} className="cal-dow" style={{
-              color: i===0?'#ffb3a7': i===6?'#a7e8e4':'var(--cream)',
-              borderRight: i<6?'1px solid rgba(255,255,255,.1)':''
+              color:i===0?'#ffb3a7':i===6?'#a7e8e4':'var(--cream)',
+              borderRight:i<6?'1px solid rgba(255,255,255,.1)':'',
             }}>{d}</div>
           ))}
         </div>
 
         {weeks.map((wk,wi)=>{
           const wTotal=weekTotal(wk);
+          const {bookIds,bookInfo}=buildWeekLanes(wk);
+
           return(
-            <div key={wi} className="cal-row">
-              {/* 週合計 */}
-              <div className="cal-week-label">
+            <div key={wi} style={{display:'grid',gridTemplateColumns:'36px repeat(7,1fr)',borderBottom:wi<weeks.length-1?'1px solid var(--rule)':''}}>
+              {/* 週合計セル */}
+              <div className="cal-week-label" style={{gridRow:`1 / ${bookIds.length+2}`}}>
                 {wTotal>0?(
                   <>
                     <div className="mono" style={{fontSize:9,color:'var(--mint)',fontWeight:'bold'}}>{fmtM(wTotal)}</div>
-                    <div style={{fontSize:7,color:'var(--ink3)'}}>今週</div>
+                    <div style={{fontSize:7,color:'var(--ink3)'}}>週計</div>
                   </>
                 ):(
                   <div style={{fontSize:8,color:'var(--rule)'}}>—</div>
                 )}
               </div>
 
+              {/* 日付行（1行目） */}
               {wk.map((cell,ci)=>{
                 if(!cell.d) return(
-                  <div key={ci} className="cal-cell other-month" style={{borderRight:ci<6?'1px solid var(--rule)':''}}/>
+                  <div key={`d${ci}`} style={{borderRight:ci<6?'1px solid var(--rule)':'',
+                    background:'var(--cream2)',opacity:.5,padding:'3px 4px',minHeight:20}}/>
                 );
                 const ds=`${year}-${pad(month+1)}-${pad(cell.d)}`;
                 const isToday=ds===today;
-                const isSun=ci===0, isSat=ci===6;
-                const daySessions=sessionMap[ds]||[];
-                const dayTotal=daySessions.reduce((a,s)=>a+s.minutes,0);
-
+                const isSun=ci===0,isSat=ci===6;
+                const dayTotal=(sessionMap[ds]||[]).reduce((a,s)=>a+s.minutes,0);
                 return(
-                  <div key={ci} className={`cal-cell${isToday?' today-cell':''}`}
-                    style={{borderRight:ci<6?'1px solid var(--rule)':''}}>
-
-                    {/* 日付 */}
-                    <div className="day-num" style={{
-                      color: isSun?'#e07b7b': isSat?'var(--mint)':'var(--choco-soft)',
-                    }}>{cell.d}</div>
-
-                    {/* タイムラインバー（本ごと） */}
-                    <div className="tl-bars">
-                      {barOrder.map(bookId=>{
-                        const meta=bookMeta[bookId];
-                        if(!meta) return null;
-                        const hasSession=meta.sessionDates.has(ds);
-
-                        // セッションなし → 空レーン（高さだけ確保してバーなし）
-                        if(!hasSession) return(
-                          <div key={bookId} className="tl-bar-row"/>
-                        );
-
-                        // この本のこの日のセッション合計
-                        const bookDayMin=daySessions
-                          .filter(s=>s.bookId===bookId)
-                          .reduce((a,s)=>a+s.minutes,0);
-
-                        // この月でこの本の最初・最後のセッション日
-                        const sortedDays=[...meta.sessionDates].sort();
-                        const firstDay=sortedDays[0];
-                        const lastDay=sortedDays.slice(-1)[0];
-                        const showTitle = ds===firstDay;
-                        const isDone = meta.endDate===ds;
-
-                        // バーの端の丸み
-                        const isFirstSession = ds===firstDay;
-                        const isLastSession = ds===lastDay;
-                        const capClass = isFirstSession && isLastSession ? 'cap-both'
-                          : isFirstSession ? 'cap-left'
-                          : isLastSession || isDone ? 'cap-right'
-                          : 'cap-none';
-
-                        return(
-                          <div key={bookId} className="tl-bar-row" title={`${meta.title} ${fmtM(bookDayMin)}`}>
-                            <div className={`tl-bar ${capClass}`} style={{background:meta.color,opacity:.9}}/>
-                            {showTitle && (
-                              <span className="tl-label">
-                                {meta.title.length>8?meta.title.slice(0,7)+'…':meta.title}
-                              </span>
-                            )}
-                            {isDone && <span className="tl-done">読了!</span>}
-                            {!showTitle && !isDone && bookDayMin>0 && (
-                              <span className="tl-min">{fmtM(bookDayMin)}</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* 複数冊ある日の合計 */}
-                    {daySessions.length>1 && dayTotal>0 &&(
-                      <div className="mono" style={{fontSize:7,color:'var(--ink3)',marginTop:1}}>
-                        計{fmtM(dayTotal)}
-                      </div>
-                    )}
+                  <div key={`d${ci}`} style={{
+                    borderRight:ci<6?'1px solid var(--rule)':'',
+                    background:isToday?'var(--mint-xpale)':'var(--white)',
+                    padding:'3px 4px 1px',
+                    display:'flex',justifyContent:'space-between',alignItems:'flex-start',
+                  }}>
+                    <span style={{
+                      fontFamily:'Klee One,cursive',fontSize:11,
+                      background:isToday?'var(--mint)':'transparent',
+                      color:isToday?'#fff':isSun?'#e07b7b':isSat?'var(--mint)':'var(--choco-soft)',
+                      borderRadius:'50%',width:18,height:18,display:'flex',alignItems:'center',justifyContent:'center',
+                    }}>{cell.d}</span>
+                    {dayTotal>0&&<span className="mono" style={{fontSize:7,color:'var(--ink3)',lineHeight:'18px'}}>{fmtM(dayTotal)}</span>}
                   </div>
                 );
               })}
+
+              {/* バー行（本ごと） */}
+              {bookIds.map((bookId,li)=>{
+                const meta=bookInfo[bookId];
+                if(!meta) return null;
+                return wk.map((cell,ci)=>{
+                  if(!cell.d) return(
+                    <div key={`b${li}_${ci}`} style={{borderRight:ci<6?'1px solid var(--rule)':'',
+                      background:'var(--cream2)',opacity:.5,height:18}}/>
+                  );
+                  const ds=`${year}-${pad(month+1)}-${pad(cell.d)}`;
+                  const hasSession=meta.sessionDays.has(ci);
+                  const isToday=ds===today;
+                  // 週内でこのセルが最初・最後のセッションの間にあるか（点線対象）
+                  const inRange = ci>=meta.first && ci<=meta.last;
+                  // この日のこの本の時間
+                  const bookDayMin=(sessionMap[ds]||[]).filter(s=>s.bookId===bookId).reduce((a,s)=>a+s.minutes,0);
+                  const isDone=meta.endDate===ds;
+                  // バーの端丸み
+                  const isFirst=ci===meta.first, isLast=ci===meta.last;
+                  const capClass=isFirst&&isLast?'cap-both':isFirst?'cap-left':isLast||isDone?'cap-right':'cap-none';
+                  // 週の最初のセル(日曜 or 月の最初のセッション)にタイトル
+                  const showTitle=ci===meta.first;
+
+                  return(
+                    <div key={`b${li}_${ci}`} style={{
+                      borderRight:ci<6?'1px solid var(--rule)':'',
+                      background:isToday?'var(--mint-xpale)':'var(--white)',
+                      height:18,
+                      position:'relative',
+                    }}>
+                      {/* バー本体 */}
+                      {hasSession&&(
+                        <div className={`tl-bar ${capClass}`}
+                          style={{background:meta.color,opacity:.9,top:7}}/>
+                      )}
+                      {/* 点線（範囲内でセッションなし） */}
+                      {!hasSession&&inRange&&(
+                        <div style={{
+                          position:'absolute',top:9,left:-3,right:-3,height:2,
+                          backgroundImage:`repeating-linear-gradient(to right,${meta.color} 0,${meta.color} 4px,transparent 4px,transparent 8px)`,
+                          opacity:.5,
+                        }}/>
+                      )}
+                      {/* タイトル */}
+                      {showTitle&&(
+                        <span className="tl-label" style={{top:0,lineHeight:'8px',paddingTop:1,zIndex:2,
+                          fontSize:7,fontWeight:700,color:'var(--choco)',
+                          textShadow:'0 0 3px #fff,0 0 3px #fff,0 0 3px #fff',
+                        }}>
+                          {meta.title.length>9?meta.title.slice(0,8)+'…':meta.title}
+                        </span>
+                      )}
+                      {/* 読了マーク */}
+                      {isDone&&(
+                        <span style={{position:'absolute',right:1,top:0,fontSize:7,
+                          fontFamily:'Klee One,cursive',fontWeight:700,
+                          color:'var(--mimosa-soft)',lineHeight:'8px',paddingTop:1,zIndex:2,
+                          textShadow:'0 0 3px #fff'}}>読了!</span>
+                      )}
+                      {/* 読書時間（タイトル表示日以外 or タイトルあっても時間も出す） */}
+                      {hasSession&&bookDayMin>0&&(
+                        <span style={{position:'absolute',right:isDone?28:1,bottom:1,fontSize:6,
+                          fontFamily:'DM Mono,monospace',color:'var(--ink3)',zIndex:2,lineHeight:1}}>
+                          {fmtM(bookDayMin)}
+                        </span>
+                      )}
+                    </div>
+                  );
+                });
+              })}
+
+              {/* 余白行（本が0冊の週） */}
+              {bookIds.length===0&&wk.map((cell,ci)=>(
+                <div key={`e${ci}`} style={{borderRight:ci<6?'1px solid var(--rule)':'',
+                  height:12,background:cell.d?'var(--white)':'var(--cream2)'}}/>
+              ))}
             </div>
           );
         })}
       </div>
 
       {/* 凡例 */}
-      <div style={{display:'flex',gap:10,marginTop:10,flexWrap:'wrap',alignItems:'center'}}>
-        {barOrder.map(id=>{
-          const b=bookMeta[id];
-          if(!b) return null;
-          return(
-            <div key={id} style={{display:'flex',alignItems:'center',gap:4}}>
-              <div style={{width:16,height:4,borderRadius:2,background:b.color}}/>
-              <span style={{fontSize:9,color:'var(--choco-soft)'}}>{b.title.length>12?b.title.slice(0,11)+'…':b.title}</span>
-            </div>
-          );
-        })}
-      </div>
+      {(()=>{
+        const legendBooks=books.filter(b=>b.sessions.some(s=>s.date.startsWith(ym)));
+        if(!legendBooks.length) return null;
+        return(
+          <div style={{display:'flex',gap:10,marginTop:10,flexWrap:'wrap',alignItems:'center'}}>
+            {legendBooks.map(b=>(
+              <div key={b.id} style={{display:'flex',alignItems:'center',gap:4}}>
+                <div style={{width:16,height:4,borderRadius:2,background:b.color}}/>
+                <span style={{fontSize:9,color:'var(--choco-soft)'}}>{b.title.length>12?b.title.slice(0,11)+'…':b.title}</span>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -654,14 +699,16 @@ function SessionLog({books}){
 function BookShelf({books,selectedId,onSelect,onEdit}){
   const [filter,setFilter]=useState('all');
   const [viewMode,setViewMode]=useState('list'); // list | gallery
-  const [sortKey,setSortKey]=useState('added');   // added | title | readtime | progress | updated
+  const [sortKey,setSortKey]=useState('added');
   const [sortDir,setSortDir]=useState('desc');
+  const [doneMonth,setDoneMonth]=useState(''); // 読了月フィルター "YYYY-MM"
   const today=todayStr();
   const ym=today.slice(0,7);
 
   const filtered=(()=>{
     if(filter==='all') return books;
     if(filter==='this-month') return books.filter(b=>b.status==='done' && b.endDate && b.endDate.startsWith(ym));
+    if(filter==='done-month') return books.filter(b=>b.status==='done' && b.endDate && b.endDate.startsWith(doneMonth));
     return books.filter(b=>b.status===filter);
   })();
 
@@ -700,6 +747,15 @@ function BookShelf({books,selectedId,onSelect,onEdit}){
               {l}{v!=='this-month'&&`（${v==='all'?books.length:books.filter(b=>b.status===v).length}）`}
             </button>
           ))}
+          {/* 読了月フィルター */}
+          <div style={{display:'flex',alignItems:'center',gap:4}}>
+            <input type="month" value={doneMonth} onChange={e=>{setDoneMonth(e.target.value);setFilter('done-month');}}
+              style={{fontSize:10,padding:'3px 6px',border:'1px solid var(--rule)',borderRadius:8,fontFamily:'Klee One',
+                background:filter==='done-month'?'var(--mint-pale)':'var(--cream2)',
+                color:filter==='done-month'?'var(--mint)':'var(--choco-soft)',cursor:'pointer'}}/>
+            {filter==='done-month'&&<button onClick={()=>{setFilter('all');setDoneMonth('');}}
+              style={{fontSize:9,padding:'3px 6px',border:'none',borderRadius:6,background:'var(--cream2)',color:'var(--ink3)',cursor:'pointer'}}>✕</button>}
+          </div>
         </div>
         {/* view toggle */}
         <div style={{display:'flex',gap:2}}>
