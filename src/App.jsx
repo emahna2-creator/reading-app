@@ -1145,6 +1145,7 @@ function ImportPanel({onImport, onTogglImport}){
 
       // Detect format: Detailed has "Start date", Summary has "Duration %"
       const isDetailed = rows[0] && ('Start date' in rows[0] || 'Start time' in rows[0]);
+      console.log('📊 Toggl判定:', isDetailed ? '詳細レポート' : 'サマリー', '| カラム:', rows[0] ? Object.keys(rows[0]) : []);
 
       if(isDetailed){
         // Detailed CSV: 1 row = 1 session with date/time
@@ -1520,6 +1521,7 @@ export default function App(){
   };
 
   const importTogglSessions = async (togglSessions, isDetailed=false) => {
+    console.log('🔄 importTogglSessions呼び出し:', {isDetailed, 件数:togglSessions.length, 先頭:togglSessions[0]});
     // プロジェクト名を正規化（スペース・括弧・記号・「」を除去して小文字に）
     const normalize = str => {
       // 全角英数字→半角に変換
