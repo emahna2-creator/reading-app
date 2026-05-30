@@ -162,7 +162,8 @@ const Fonts = () => (
     .cal-cell.other-month { background:var(--cream2); opacity:.5; }
     .cal-cell.today-cell { background:var(--mint-xpale); }
     .cal-cell.today-cell .day-num { background:var(--mint); color:#fff; border-radius:50%; }
-    .day-num { font-family:'Klee One',cursive; font-size:11px; color:var(--choco-soft); width:18px; height:18px; display:flex; align-items:center; justify-content:center; margin-bottom:2px; }
+    .day-num { font-family:'Klee One',cursive; font-size:11px; color:var(--choco-soft); width:18px; height:18px; display:flex; align-items:center; justify-content:center; margin-bottom:2px; position:relative; }
+    .read-circle { position:absolute; inset:-3px; border-radius:50% 48% 52% 50% / 48% 52% 48% 52%; border:2px solid var(--mint); opacity:.7; pointer-events:none; transform:rotate(-2deg); }
     .tl-bars { display:flex; flex-direction:column; gap:2px; margin-top:2px; }
     .tl-bar-row { position:relative; height:16px; }
     /* セルの端まで伸ばす: left/right をネガティブマージンでpadding分だけ広げる */
@@ -173,7 +174,7 @@ const Fonts = () => (
     .tl-bar.cap-none  { left:-3px; right:-3px; border-radius:0; }
     /* タイトル: 濃いチョコ色・太字 */
     .tl-label { font-family:'Klee One',cursive; font-size:8px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; position:absolute; left:3px; top:0; line-height:14px; pointer-events:none; max-width:calc(100% - 4px); color:var(--choco); text-shadow:0 0 3px #fff,0 0 3px #fff; }
-    .tl-done  { font-family:'Klee One',cursive; font-size:7px; font-weight:700; position:absolute; right:1px; top:0; line-height:14px; color:var(--mimosa-soft); text-shadow:0 0 3px #fff; }
+    .tl-done  { font-family:'Klee One',cursive; font-size:7px; font-weight:700; position:absolute; right:1px; top:0; line-height:14px; color:#fff; background:#e07b7b; border-radius:3px; padding:0 2px; }
     .tl-min   { font-family:'DM Mono',monospace; font-size:7px; color:var(--choco-soft); font-weight:600; position:absolute; right:2px; top:0; line-height:14px; }
 
     /* import panel */
@@ -487,7 +488,19 @@ function MonthlyCalendar({books}){
                       background:isToday?'var(--mint)':'transparent',
                       color:isToday?'#fff':isSun?'#e07b7b':isSat?'var(--mint)':'var(--choco-soft)',
                       borderRadius:'50%',width:18,height:18,display:'flex',alignItems:'center',justifyContent:'center',
-                    }}>{cell.d}</span>
+                      position:'relative',
+                    }}>
+                      {cell.d}
+                      {!isToday&&dayTotal>0&&(
+                        <span style={{
+                          position:'absolute',inset:-3,
+                          borderRadius:'50% 48% 52% 50% / 48% 52% 48% 52%',
+                          border:'2px solid var(--mint)',
+                          opacity:.65,transform:'rotate(-2deg)',
+                          pointerEvents:'none',
+                        }}/>
+                      )}
+                    </span>
                     {dayTotal>0&&<span className="mono" style={{fontSize:7,color:'var(--ink3)',lineHeight:'18px'}}>{fmtM(dayTotal)}</span>}
                   </div>
                 );
@@ -547,10 +560,10 @@ function MonthlyCalendar({books}){
                       )}
                       {/* 読了マーク */}
                       {isDone&&(
-                        <span style={{position:'absolute',right:1,top:0,fontSize:7,
+                        <span style={{position:'absolute',right:1,top:1,fontSize:7,
                           fontFamily:'Klee One,cursive',fontWeight:700,
-                          color:'var(--mimosa-soft)',lineHeight:'8px',paddingTop:1,zIndex:2,
-                          textShadow:'0 0 3px #fff'}}>読了!</span>
+                          color:'#fff',background:'#e07b7b',borderRadius:3,
+                          padding:'0 2px',zIndex:2,lineHeight:'12px'}}>読了!</span>
                       )}
                       {/* 読書時間（タイトル表示日以外 or タイトルあっても時間も出す） */}
                       {hasSession&&bookDayMin>0&&(
@@ -1705,7 +1718,7 @@ export default function App(){
             <div style={{width:36,height:36,borderRadius:'50%',background:'var(--mint)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>📖</div>
             <div>
               <div className="klee" style={{fontSize:19,fontWeight:600,color:'var(--mint)',letterSpacing:'.04em',lineHeight:1}}>よみまる</div>
-              <div className="mono" style={{fontSize:8,color:'var(--ink3)',letterSpacing:'.15em'}}>MY READING LOG</div>
+              <div className="klee" style={{fontSize:9,color:'var(--choco-soft)',letterSpacing:'.05em',marginTop:1}}>よんだひに、まるをつける。</div>
             </div>
           </div>
           <div style={{marginLeft:'auto',display:'flex',gap:10,alignItems:'center'}}>
