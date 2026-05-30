@@ -174,7 +174,7 @@ const Fonts = () => (
     .tl-bar.cap-none  { left:-3px; right:-3px; border-radius:0; }
     /* タイトル: 濃いチョコ色・太字 */
     .tl-label { font-family:'Klee One',cursive; font-size:8px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; position:absolute; left:3px; top:0; line-height:14px; pointer-events:none; max-width:calc(100% - 4px); color:var(--choco); text-shadow:0 0 3px #fff,0 0 3px #fff; }
-    .tl-done  { font-family:'Klee One',cursive; font-size:7px; font-weight:700; position:absolute; right:1px; top:0; line-height:14px; color:#fff; background:#e07b7b; border-radius:3px; padding:0 2px; }
+    .tl-done  { font-family:'Klee One',cursive; font-size:7px; font-weight:600; position:absolute; right:1px; top:0; line-height:14px; }
     .tl-min   { font-family:'DM Mono',monospace; font-size:7px; color:var(--choco-soft); font-weight:600; position:absolute; right:2px; top:0; line-height:14px; }
 
     /* import panel */
@@ -485,22 +485,10 @@ function MonthlyCalendar({books}){
                   }}>
                     <span style={{
                       fontFamily:'Klee One,cursive',fontSize:11,
-                      background:isToday?'var(--mint)':'transparent',
-                      color:isToday?'#fff':isSun?'#e07b7b':isSat?'var(--mint)':'var(--choco-soft)',
+                      background:dayTotal>0?'var(--mint)':'transparent',
+                      color:dayTotal>0?'#fff':isSun?'#e07b7b':isSat?'var(--mint)':'var(--choco-soft)',
                       borderRadius:'50%',width:18,height:18,display:'flex',alignItems:'center',justifyContent:'center',
-                      position:'relative',
-                    }}>
-                      {cell.d}
-                      {!isToday&&dayTotal>0&&(
-                        <span style={{
-                          position:'absolute',inset:-3,
-                          borderRadius:'50% 48% 52% 50% / 48% 52% 48% 52%',
-                          border:'2px solid var(--mint)',
-                          opacity:.65,transform:'rotate(-2deg)',
-                          pointerEvents:'none',
-                        }}/>
-                      )}
-                    </span>
+                    }}>{cell.d}</span>
                     {dayTotal>0&&<span className="mono" style={{fontSize:7,color:'var(--ink3)',lineHeight:'18px'}}>{fmtM(dayTotal)}</span>}
                   </div>
                 );
@@ -560,10 +548,10 @@ function MonthlyCalendar({books}){
                       )}
                       {/* 読了マーク */}
                       {isDone&&(
-                        <span style={{position:'absolute',right:1,top:1,fontSize:7,
-                          fontFamily:'Klee One,cursive',fontWeight:700,
-                          color:'#fff',background:'#e07b7b',borderRadius:3,
-                          padding:'0 2px',zIndex:2,lineHeight:'12px'}}>読了!</span>
+                        <span style={{position:'absolute',right:1,top:0,fontSize:7,
+                          fontFamily:'Klee One,cursive',fontWeight:600,
+                          color:'var(--choco)',zIndex:2,lineHeight:'14px',
+                          textShadow:'0 0 3px #fff,0 0 3px #fff'}}>読了!</span>
                       )}
                       {/* 読書時間（タイトル表示日以外 or タイトルあっても時間も出す） */}
                       {hasSession&&bookDayMin>0&&(
