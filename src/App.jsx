@@ -163,15 +163,18 @@ const Fonts = () => (
     .cal-cell.today-cell { background:var(--mint-xpale); }
     .cal-cell.today-cell .day-num { background:var(--mint); color:#fff; border-radius:50%; }
     .day-num { font-family:'Klee One',cursive; font-size:11px; color:var(--choco-soft); width:18px; height:18px; display:flex; align-items:center; justify-content:center; margin-bottom:2px; }
-    .tl-bars { display:flex; flex-direction:column; gap:3px; margin-top:1px; }
+    .tl-bars { display:flex; flex-direction:column; gap:2px; margin-top:2px; }
     .tl-bar-row { position:relative; height:16px; }
-    .tl-bar { height:4px; border-radius:2px; position:absolute; top:6px; left:0; right:0; }
-    .tl-bar.cap-left  { left:2px; border-radius:2px 0 0 2px; }
-    .tl-bar.cap-right { right:2px; border-radius:0 2px 2px 0; }
-    .tl-bar.cap-both  { left:2px; right:2px; border-radius:2px; }
-    .tl-label { font-family:'Klee One',cursive; font-size:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; position:absolute; left:3px; top:0; line-height:14px; pointer-events:none; max-width:calc(100% - 4px); color:var(--choco); }
-    .tl-done  { font-family:'Klee One',cursive; font-size:7px; position:absolute; right:1px; top:0; line-height:14px; color:var(--mimosa-soft); }
-    .tl-min   { font-family:'DM Mono',monospace; font-size:7px; color:var(--ink3); position:absolute; right:2px; top:0; line-height:14px; }
+    /* セルの端まで伸ばす: left/right をネガティブマージンでpadding分だけ広げる */
+    .tl-bar { height:5px; border-radius:0; position:absolute; top:6px; left:-3px; right:-3px; }
+    .tl-bar.cap-left  { left:2px; border-radius:3px 0 0 3px; }
+    .tl-bar.cap-right { right:2px; border-radius:0 3px 3px 0; }
+    .tl-bar.cap-both  { left:2px; right:2px; border-radius:3px; }
+    .tl-bar.cap-none  { left:-3px; right:-3px; border-radius:0; }
+    /* タイトル: 濃いチョコ色・太字 */
+    .tl-label { font-family:'Klee One',cursive; font-size:8px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; position:absolute; left:3px; top:0; line-height:14px; pointer-events:none; max-width:calc(100% - 4px); color:var(--choco); text-shadow:0 0 3px #fff,0 0 3px #fff; }
+    .tl-done  { font-family:'Klee One',cursive; font-size:7px; font-weight:700; position:absolute; right:1px; top:0; line-height:14px; color:var(--mimosa-soft); text-shadow:0 0 3px #fff; }
+    .tl-min   { font-family:'DM Mono',monospace; font-size:7px; color:var(--choco-soft); font-weight:600; position:absolute; right:2px; top:0; line-height:14px; }
 
     /* import panel */
     .import-panel { background:var(--mint-pale); border:2px dashed var(--mint-light); border-radius:14px; padding:20px; text-align:center; }
@@ -471,23 +474,27 @@ function MonthlyCalendar({books}){
                         const meta=bookMeta[bookId];
                         if(!meta) return null;
                         const hasSession=meta.sessionDates.has(ds);
-                        if(!hasSession) return null;
+
+                        // セッションなし → 空レーン（高さだけ確保してバーなし）
+                        if(!hasSession) return(
+                          <div key={bookId} className="tl-bar-row"/>
+                        );
 
                         // この本のこの日のセッション合計
                         const bookDayMin=daySessions
                           .filter(s=>s.bookId===bookId)
                           .reduce((a,s)=>a+s.minutes,0);
 
-                        // この月でこの本の最初のセッション日 → タイトルを表示
-                        const firstDay=[...meta.sessionDates].sort()[0];
+                        // この月でこの本の最初・最後のセッション日
+                        const sortedDays=[...meta.sessionDates].sort();
+                        const firstDay=sortedDays[0];
+                        const lastDay=sortedDays.slice(-1)[0];
                         const showTitle = ds===firstDay;
-
-                        // 読了日かどうか
                         const isDone = meta.endDate===ds;
 
-                        // バーの端の丸み: 最初のセッション日=左端丸, 読了日=右端丸
+                        // バーの端の丸み
                         const isFirstSession = ds===firstDay;
-                        const isLastSession = ds===[...meta.sessionDates].sort().slice(-1)[0];
+                        const isLastSession = ds===lastDay;
                         const capClass = isFirstSession && isLastSession ? 'cap-both'
                           : isFirstSession ? 'cap-left'
                           : isLastSession || isDone ? 'cap-right'
@@ -495,9 +502,9 @@ function MonthlyCalendar({books}){
 
                         return(
                           <div key={bookId} className="tl-bar-row" title={`${meta.title} ${fmtM(bookDayMin)}`}>
-                            <div className={`tl-bar ${capClass}`} style={{background:meta.color,opacity:.85}}/>
+                            <div className={`tl-bar ${capClass}`} style={{background:meta.color,opacity:.9}}/>
                             {showTitle && (
-                              <span className="tl-label" style={{color:meta.color}}>
+                              <span className="tl-label">
                                 {meta.title.length>8?meta.title.slice(0,7)+'…':meta.title}
                               </span>
                             )}
