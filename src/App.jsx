@@ -715,6 +715,7 @@ function BookShelf({books,selectedId,onSelect,onEdit}){
   const sorted=[...filtered].sort((a,b)=>{
     let v=0;
     if(sortKey==='title')    v=a.title.localeCompare(b.title,'ja');
+    if(sortKey==='endDate')  v=(a.endDate||'').localeCompare(b.endDate||'');
     if(sortKey==='readtime') v=a.sessions.reduce((s,r)=>s+r.minutes,0)-b.sessions.reduce((s,r)=>s+r.minutes,0);
     if(sortKey==='progress'){
       const pa=a.totalPages?a.currentPage/a.totalPages:0;
@@ -731,7 +732,7 @@ function BookShelf({books,selectedId,onSelect,onEdit}){
   });
 
   const SORT_OPTIONS=[
-    ['added','登録順'],['updated','最終読書'],['readtime','読書時間'],['progress','進捗率'],['title','タイトル'],
+    ['added','登録順'],['updated','最終読書'],['readtime','読書時間'],['progress','進捗率'],['endDate','読了日'],['title','タイトル'],
   ];
 
   return(
