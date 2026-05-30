@@ -1412,6 +1412,7 @@ function AddBookModal({onAdd,onClose,editBook}){
 // ══════════════════════════════════════════════════════════════
 export default function App(){
   const [tab,setTab]=useState('shelf');
+  const [unmatchedProjects,setUnmatchedProjects]=useState([]);
   const [books,setBooks]=useState([]);
   const [selId,setSelId]=useState(null);
   const [showAdd,setShowAdd]=useState(false);
@@ -1419,7 +1420,7 @@ export default function App(){
   const [toast,setToast]=useState(null);
   const [loading,setLoading]=useState(true);
 
-  const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(null),2200)};
+  const showToast=(msg,dur=2200)=>{setToast(msg);setTimeout(()=>setToast(null),dur)};
 
   // ── Supabase: load all data ──────────────────────────────────
   useEffect(()=>{
@@ -1520,11 +1521,14 @@ export default function App(){
 
   const importTogglSessions = async (togglSessions, isDetailed=false) => {
     // プロジェクト名を正規化（スペース・括弧・記号・「」を除去して小文字に）
-    const normalize = str =>
-      str.toLowerCase()
+    const normalize = str => {
+      // 全角英数字→半角に変換
+      const han = str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+      return han.toLowerCase()
         .replace(/[「」『』【】［］\[\]()（）《》〈〉]/g,'')  // 括弧類
-        .replace(/[・：:\/／]/g,'')                          // 区切り記号
+        .replace(/[・：:\/／、。，．？！,\.?!]/g,'')         // 記号・句読点
         .replace(/[　\s]+/g,'');                             // スペース全角半角
+    };
 
     const matchBook = (projectName) => {
       const tName = normalize(projectName);
@@ -1603,7 +1607,9 @@ export default function App(){
         id:s.id,date:s.date,start:s.start_time||'00:00',minutes:s.minutes||0,note:s.note||''
       }))
     })));
-    showToast(`⏱ ${matched}件のセッションを反映しました！`);
+    const unmatched=[...new Set(togglSessions.filter(s=>!matchBook(s.projectName)).map(s=>s.projectName))];
+    setUnmatchedProjects(unmatched);
+    showToast(`⏱ ${matched}件反映、未マッチ${unmatched.length}件`, 3000);
   };
 
   const addBook = async (data) => {
@@ -1704,7 +1710,29 @@ export default function App(){
           {tab==='log'&&<SessionLog books={books}/>}
           {tab==='hl'&&<HighlightPanel books={books} selectedId={selId} onSelectBook={setSelId} onAddHighlight={addHighlight}/>}
           {tab==='timer'&&<TimerPanel books={books} onSaveSession={saveSession}/>}
-          {tab==='import'&&<ImportPanel onImport={importBooks} onTogglImport={importTogglSessions}/>}
+          {tab==='import'&&(
+            <div>
+              <ImportPanel onImport={importBooks} onTogglImport={importTogglSessions}/>
+              {unmatchedProjects.length>0&&(
+                <div style={{marginTop:16,background:'var(--cream2)',borderRadius:12,padding:'12px 14px',border:'1px solid var(--rule)'}}>
+                  <div className="klee" style={{fontSize:12,color:'var(--choco)',fontWeight:600,marginBottom:8}}>
+                    ⚠️ 未マッチ: {unmatchedProjects.length}件（本棚の本と紐づけられなかったTogglプロジェクト）
+                  </div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                    {unmatchedProjects.map(p=>(
+                      <span key={p} style={{fontSize:10,padding:'3px 8px',borderRadius:6,
+                        background:'var(--white)',border:'1px solid var(--rule)',color:'var(--ink3)',fontFamily:'Klee One'}}>
+                        {p}
+                      </span>
+                    ))}
+                  </div>
+                  <div style={{fontSize:10,color:'var(--ink3)',marginTop:8}}>
+                    💡 本棚の本タイトルを編集してTogglのプロジェクト名に近づけると自動でマッチします
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* footer */}
