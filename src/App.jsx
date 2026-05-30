@@ -604,6 +604,7 @@ function SessionLog({books}){
   const inPeriod=d=>{
     if(period==='week') return d>=weekStartOf(today)&&d<=today;
     if(period==='month') return d>=monthStartOf(today)&&d<=today;
+    if(period==='year') return d>=`${today.slice(0,4)}-01-01`&&d<=today;
     return true;
   };
 
@@ -624,7 +625,7 @@ function SessionLog({books}){
       <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,flexWrap:'wrap'}}>
         <h2 className="klee" style={{fontSize:16,fontWeight:600}}>📋 セッションログ</h2>
         <div style={{marginLeft:'auto',display:'flex',gap:4}}>
-          {[['week','今週'],['month','今月'],['all','全期間']].map(([v,l])=>(
+          {[['week','今週'],['month','今月'],['year','今年'],['all','全期間']].map(([v,l])=>(
             <button key={v} onClick={()=>setPeriod(v)}
               style={{padding:'5px 12px',fontSize:11,fontFamily:'Klee One',cursor:'pointer',borderRadius:8,
                 background:period===v?'var(--mint)':'transparent',
