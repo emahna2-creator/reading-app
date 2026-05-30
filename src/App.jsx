@@ -152,11 +152,13 @@ const Fonts = () => (
     /* calendar */
     /* ── TIMELINE CALENDAR ── */
     .cal-wrap { background:var(--white); border-radius:16px; border:2px solid var(--mint-light); overflow:hidden; }
-    .cal-header-row { display:grid; grid-template-columns:36px repeat(7,1fr); background:var(--mint); color:#fff; }
-    .cal-dow { font-family:'Klee One',cursive; font-size:11px; text-align:center; padding:6px 2px; }
-    .cal-row { display:grid; grid-template-columns:36px repeat(7,1fr); border-bottom:1px solid var(--rule); }
-    .cal-row:last-child { border-bottom:none; }
-    .cal-week-label { background:var(--mint-xpale); display:flex; flex-direction:column; align-items:center; justify-content:center; border-right:1px solid var(--rule); padding:3px 2px; gap:2px; }
+    /* カレンダー全体を1つのgrid */
+    .cal-grid { display:grid; grid-template-columns:36px repeat(7,1fr); }
+    .cal-header-row { display:contents; }
+    .cal-dow { font-family:'Klee One',cursive; font-size:11px; text-align:center; padding:6px 2px; background:var(--mint); color:var(--cream); }
+    .cal-dow:first-child { background:var(--choco); }
+    .cal-row { display:contents; }
+    .cal-week-label { background:var(--mint-xpale); display:flex; flex-direction:column; align-items:center; justify-content:center; border-right:1px solid var(--rule); border-bottom:1px solid var(--rule); padding:3px 2px; gap:2px; }
     .cal-cell { border-right:1px solid var(--rule); padding:3px 3px 4px; position:relative; background:var(--white); min-height:64px; }
     .cal-cell:last-child { border-right:none; }
     .cal-cell.other-month { background:var(--cream2); opacity:.5; }
@@ -435,11 +437,10 @@ function MonthlyCalendar({books}){
 
       {/* カレンダー本体 */}
       <div className="cal-wrap">
+        <div className="cal-grid">
         {/* 曜日ヘッダー */}
         <div className="cal-header-row">
-          <div style={{background:'var(--choco)',borderRight:'1px solid rgba(255,255,255,.15)',display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <span style={{fontSize:9,color:'rgba(255,255,255,.5)',fontFamily:'DM Mono'}}>週計</span>
-          </div>
+          <div className="cal-dow" style={{background:'var(--choco)',color:'rgba(255,255,255,.5)',fontFamily:'DM Mono',fontSize:9}}>週計</div>
           {DOW.map((d,i)=>(
             <div key={d} className="cal-dow" style={{
               color:i===0?'#ffb3a7':i===6?'#a7e8e4':'var(--cream)',
@@ -453,9 +454,9 @@ function MonthlyCalendar({books}){
           const {bookIds,bookInfo}=buildWeekLanes(wk);
 
           return(
-            <div key={wi} style={{display:'grid',gridTemplateColumns:'36px repeat(7,1fr)',borderBottom:wi<weeks.length-1?'1px solid var(--rule)':''}}>
+            <div key={wi} className="cal-row">
               {/* 週合計セル */}
-              <div className="cal-week-label" style={{gridRow:`1 / ${bookIds.length+2}`}}>
+              <div className="cal-week-label" style={{gridRow:`span ${bookIds.length+1}`}}>
                 {wTotal>0?(
                   <>
                     <div className="mono" style={{fontSize:9,color:'var(--mint)',fontWeight:'bold'}}>{fmtM(wTotal)}</div>
@@ -573,7 +574,8 @@ function MonthlyCalendar({books}){
             </div>
           );
         })}
-      </div>
+        </div>{/* /cal-grid */}
+      </div>{/* /cal-wrap */}
 
       {/* 凡例 */}
       {(()=>{
