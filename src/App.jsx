@@ -1562,7 +1562,7 @@ export default function App(){
         const book = matchBook(s.projectName);
         if(!book) continue;
         // 開始時刻をキーに使う（秒まで含めて一意にする）
-        const startKey = (s.start||'00:00').replace(':','').slice(0,4);
+        const startKey = (s.start||'00:00').replace(/:/g,'').slice(0,6);
         const id = `toggl-${book.id}-${s.date}-${startKey}`;
         if(existingIds.has(id)) continue;
         rows.push({
