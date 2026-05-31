@@ -153,21 +153,21 @@ const Fonts = () => (
     /* ── TIMELINE CALENDAR ── */
     .cal-wrap { background:var(--white); border-radius:16px; border:2px solid var(--mint-light); overflow:hidden; }
     /* カレンダー全体を1つのgrid */
-    .cal-grid { display:grid; grid-template-columns:36px repeat(7,1fr); }
+    .cal-grid { display:grid; grid-template-columns:24px repeat(7,1fr); min-width:0; }
     .cal-header-row { display:contents; }
-    .cal-dow { font-family:'Klee One',cursive; font-size:11px; text-align:center; padding:6px 2px; background:var(--mint); color:var(--cream); }
+    .cal-dow { font-family:'Klee One',cursive; font-size:9px; text-align:center; padding:4px 1px; background:var(--mint); color:var(--cream); }
     .cal-dow:first-child { background:var(--choco); }
     .cal-row { display:contents; }
-    .cal-week-label { background:var(--mint-xpale); display:flex; flex-direction:column; align-items:center; justify-content:center; border-right:1px solid var(--rule); border-bottom:1px solid var(--rule); padding:3px 2px; gap:2px; }
+    .cal-week-label { background:var(--mint-xpale); display:flex; flex-direction:column; align-items:center; justify-content:center; border-right:1px solid var(--rule); border-bottom:1px solid var(--rule); padding:2px 1px; gap:1px; }
     .cal-cell { border-right:1px solid var(--rule); padding:3px 3px 4px; position:relative; background:var(--white); min-height:64px; }
     .cal-cell:last-child { border-right:none; }
     .cal-cell.other-month { background:var(--cream2); opacity:.5; }
     .cal-cell.today-cell { background:var(--mint-xpale); }
     .cal-cell.today-cell .day-num { background:var(--mint); color:#fff; border-radius:50%; }
-    .day-num { font-family:'Klee One',cursive; font-size:11px; color:var(--choco-soft); width:18px; height:18px; display:flex; align-items:center; justify-content:center; margin-bottom:2px; position:relative; }
+    .day-num { font-family:'Klee One',cursive; font-size:9px; color:var(--choco-soft); width:16px; height:16px; display:flex; align-items:center; justify-content:center; margin-bottom:1px; position:relative; }
     .read-circle { position:absolute; inset:-3px; border-radius:50% 48% 52% 50% / 48% 52% 48% 52%; border:2px solid var(--mint); opacity:.7; pointer-events:none; transform:rotate(-2deg); }
     .tl-bars { display:flex; flex-direction:column; gap:2px; margin-top:2px; }
-    .tl-bar-row { position:relative; height:16px; }
+    .tl-bar-row { position:relative; height:14px; }
     /* セルの端まで伸ばす: left/right をネガティブマージンでpadding分だけ広げる */
     .tl-bar { height:5px; border-radius:0; position:absolute; top:6px; left:-3px; right:-3px; }
     .tl-bar.cap-left  { left:2px; border-radius:3px 0 0 3px; }
@@ -175,7 +175,7 @@ const Fonts = () => (
     .tl-bar.cap-both  { left:2px; right:2px; border-radius:3px; }
     .tl-bar.cap-none  { left:-3px; right:-3px; border-radius:0; }
     /* タイトル: 濃いチョコ色・太字 */
-    .tl-label { font-family:'Klee One',cursive; font-size:8px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; position:absolute; left:3px; top:0; line-height:14px; pointer-events:none; max-width:calc(100% - 4px); color:var(--choco); text-shadow:0 0 3px #fff,0 0 3px #fff; }
+    .tl-label { font-family:'Klee One',cursive; font-size:7px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; position:absolute; left:2px; top:0; line-height:13px; pointer-events:none; max-width:calc(100% - 2px); color:var(--choco); text-shadow:0 0 3px #fff,0 0 3px #fff; }
     .tl-done  { font-family:'Klee One',cursive; font-size:7px; font-weight:600; position:absolute; right:1px; top:0; line-height:14px; }
     .tl-min   { font-family:'DM Mono',monospace; font-size:7px; color:var(--choco-soft); font-weight:600; position:absolute; right:2px; top:0; line-height:14px; }
 
@@ -337,7 +337,7 @@ function MonthlyCalendar({books}){
   const today = todayStr();
 
   const dim = new Date(year, month+1, 0).getDate();
-  const firstDow = new Date(year, month, 1).getDay(); // 0=日
+  const firstDow = (new Date(year, month, 1).getDay() + 6) % 7; // 0=月曜
 
   // カレンダーのセル（週ごとに分割）
   const cells = [];
@@ -409,7 +409,7 @@ function MonthlyCalendar({books}){
     return {bookIds, bookInfo};
   };
 
-  const DOW=['日','月','火','水','木','金','土'];
+  const DOW=['月','火','水','木','金','土','日'];
   const prev=()=>{ if(month===0){setYear(y=>y-1);setMonth(11);}else setMonth(m=>m-1); };
   const next=()=>{ if(month===11){setYear(y=>y+1);setMonth(0);}else setMonth(m=>m+1); };
 
@@ -443,7 +443,7 @@ function MonthlyCalendar({books}){
           <div className="cal-dow" style={{background:'var(--choco)',color:'rgba(255,255,255,.5)',fontFamily:'DM Mono',fontSize:9}}>週計</div>
           {DOW.map((d,i)=>(
             <div key={d} className="cal-dow" style={{
-              color:i===0?'#ffb3a7':i===6?'#a7e8e4':'var(--cream)',
+              color:i===6?'#ffb3a7':i===5?'#a7e8e4':'var(--cream)',
               borderRight:i<6?'1px solid rgba(255,255,255,.1)':'',
             }}>{d}</div>
           ))}
@@ -459,8 +459,8 @@ function MonthlyCalendar({books}){
               <div className="cal-week-label" style={{gridRow:`span ${bookIds.length+1}`}}>
                 {wTotal>0?(
                   <>
-                    <div className="mono" style={{fontSize:9,color:'var(--mint)',fontWeight:'bold'}}>{fmtM(wTotal)}</div>
-                    <div style={{fontSize:7,color:'var(--ink3)'}}>週計</div>
+                    <div className="mono" style={{fontSize:7,color:'var(--mint)',fontWeight:'bold'}}>{fmtM(wTotal)}</div>
+                    <div style={{fontSize:6,color:'var(--ink3)'}}>週計</div>
                   </>
                 ):(
                   <div style={{fontSize:8,color:'var(--rule)'}}>—</div>
@@ -475,7 +475,7 @@ function MonthlyCalendar({books}){
                 );
                 const ds=`${year}-${pad(month+1)}-${pad(cell.d)}`;
                 const isToday=ds===today;
-                const isSun=ci===0,isSat=ci===6;
+                const isSun=ci===6,isSat=ci===5; // 月曜始まり: 6=日,5=土
                 const dayTotal=(sessionMap[ds]||[]).reduce((a,s)=>a+s.minutes,0);
                 return(
                   <div key={`d${ci}`} style={{
