@@ -459,8 +459,10 @@ function MonthlyCalendar({books}){
               <div className="cal-week-label" style={{gridRow:`span ${bookIds.length+1}`}}>
                 {wTotal>0?(
                   <>
-                    <div className="mono" style={{fontSize:6,color:'var(--mint)',fontWeight:'bold'}}>{fmtM(wTotal)}</div>
-                    <div style={{fontSize:5,color:'var(--ink3)'}}>週計</div>
+                    <div className="mono" style={{
+                      fontSize:7,color:'var(--mint)',fontWeight:'bold',
+                      writingMode:'vertical-rl',letterSpacing:1,
+                    }}>{fmtM(wTotal)}</div>
                   </>
                 ):(
                   <div style={{fontSize:8,color:'var(--rule)'}}>—</div>
