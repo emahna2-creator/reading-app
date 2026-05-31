@@ -1324,6 +1324,7 @@ function AddBookModal({onAdd,onClose,editBook}){
   const [status,setStatus]=useState(editBook?.status||'want');
   const [coverUrl,setCoverUrl]=useState(editBook?.coverUrl||'');
   const [color,setColor]=useState(editBook?.color||COLORS[0]);
+  const [endDate,setEndDate]=useState(editBook?.endDate||'');
   const [loading,setLoading]=useState(false);
 
   const fetchISBN=async()=>{
@@ -1353,7 +1354,7 @@ function AddBookModal({onAdd,onClose,editBook}){
       totalPages:parseInt(pages)||0,
       currentPage:editBook?.currentPage||0,
       startDate:editBook?.startDate||(status!=='want'?todayStr():null),
-      endDate:editBook?.endDate||(status==='done'?todayStr():null),
+      endDate:status==='done'?(endDate||editBook?.endDate||todayStr()):null,
     });
   };
 
@@ -1393,13 +1394,20 @@ function AddBookModal({onAdd,onClose,editBook}){
             </div>
             <div><label className="klee" style={{fontSize:10,color:'var(--ink3)'}}>表紙URL（任意）</label>
               <input className="inp" value={coverUrl} onChange={e=>setCoverUrl(e.target.value)} placeholder="https://..." style={{marginTop:4}}/></div>
-            <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
               <label className="klee" style={{fontSize:10,color:'var(--ink3)'}}>ステータス</label>
               <select value={status} onChange={e=>setStatus(e.target.value)}>
                 <option value="want">積読</option>
                 <option value="reading">読中</option>
                 <option value="done">読了</option>
               </select>
+              {status==='done'&&(
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <label className="klee" style={{fontSize:10,color:'var(--ink3)'}}>読了日</label>
+                  <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)}
+                    style={{fontSize:11,padding:'3px 6px',border:'1px solid var(--rule)',borderRadius:8,fontFamily:'Klee One'}}/>
+                </div>
+              )}
             </div>
             <div>
               <label className="klee" style={{fontSize:10,color:'var(--ink3)',display:'block',marginBottom:6}}>ライン色</label>
