@@ -727,8 +727,8 @@ function BookShelf({books,selectedId,onSelect,onEdit}){
     if(sortKey==='endDate'){
       const ea=a.endDate||''; const eb=b.endDate||'';
       if(!ea&&!eb) v=0;
-      else if(!ea) v=-1; // endDateなし→descなら後ろ（ascなら前）
-      else if(!eb) v=1;
+      else if(!ea) return 1;  // endDateなし→常に後ろ
+      else if(!eb) return -1; // endDateなし→常に後ろ
       else v=ea.localeCompare(eb);
     }
     if(sortKey==='readtime') v=a.sessions.reduce((s,r)=>s+r.minutes,0)-b.sessions.reduce((s,r)=>s+r.minutes,0);
