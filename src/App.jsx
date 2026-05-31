@@ -459,10 +459,13 @@ function MonthlyCalendar({books}){
               <div className="cal-week-label" style={{gridRow:`span ${bookIds.length+1}`}}>
                 {wTotal>0?(
                   <>
-                    <div className="mono" style={{
-                      fontSize:7,color:'var(--mint)',fontWeight:'bold',
-                      writingMode:'vertical-rl',letterSpacing:1,
-                    }}>{fmtM(wTotal)}</div>
+                    {(()=>{
+                      const h=Math.floor(wTotal/60), m=wTotal%60;
+                      return(<>
+                        {h>0&&<div className="mono" style={{fontSize:7,color:'var(--mint)',fontWeight:'bold',lineHeight:1.2}}>{h}h</div>}
+                        {m>0&&<div className="mono" style={{fontSize:7,color:'var(--mint)',fontWeight:'bold',lineHeight:1.2}}>{m}m</div>}
+                      </>);
+                    })()}
                   </>
                 ):(
                   <div style={{fontSize:8,color:'var(--rule)'}}>—</div>
@@ -705,7 +708,7 @@ function SessionLog({books}){
 function BookShelf({books,selectedId,onSelect,onEdit}){
   const [filter,setFilter]=useState('all');
   const [viewMode,setViewMode]=useState('list'); // list | gallery
-  const [sortKey,setSortKey]=useState('added');
+  const [sortKey,setSortKey]=useState('endDate');
   const [sortDir,setSortDir]=useState('desc');
   const [doneMonth,setDoneMonth]=useState(''); // 読了月フィルター "YYYY-MM"
   const today=todayStr();
@@ -721,7 +724,13 @@ function BookShelf({books,selectedId,onSelect,onEdit}){
   const sorted=[...filtered].sort((a,b)=>{
     let v=0;
     if(sortKey==='title')    v=a.title.localeCompare(b.title,'ja');
-    if(sortKey==='endDate')  v=(a.endDate||'').localeCompare(b.endDate||'');
+    if(sortKey==='endDate'){
+      const ea=a.endDate||''; const eb=b.endDate||'';
+      if(!ea&&!eb) v=0;
+      else if(!ea) v=-1; // endDateなし→descなら後ろ（ascなら前）
+      else if(!eb) v=1;
+      else v=ea.localeCompare(eb);
+    }
     if(sortKey==='readtime') v=a.sessions.reduce((s,r)=>s+r.minutes,0)-b.sessions.reduce((s,r)=>s+r.minutes,0);
     if(sortKey==='progress'){
       const pa=a.totalPages?a.currentPage/a.totalPages:0;
@@ -1689,7 +1698,7 @@ export default function App(){
       <Fonts/>
       <div style={{height:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'var(--cream)',gap:16}}>
         <div style={{fontSize:48}}>📚</div>
-        <div className="klee" style={{fontSize:16,color:'var(--mint)'}}>読書録を読み込み中…</div>
+        <div className="klee" style={{fontSize:16,color:'var(--mint)'}}>読み込み中…</div>
         <div style={{width:120,height:4,background:'var(--mint-light)',borderRadius:99,overflow:'hidden'}}>
           <div style={{height:'100%',background:'var(--mint)',borderRadius:99,animation:'loading 1.2s ease-in-out infinite'}}/>
         </div>
