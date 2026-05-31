@@ -212,7 +212,7 @@ const fmtT = s => `${pad(Math.floor(s/3600))}:${pad(Math.floor((s%3600)/60))}:${
 const fmtM = m => m >= 60 ? `${Math.floor(m/60)}h${m%60>0 ? pad(m%60)+'m' : ''}` : `${m}m`;
 const todayStr = () => new Date().toISOString().slice(0,10);
 const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate()+n); return r.toISOString().slice(0,10); };
-const weekStartOf = d => { const r = new Date(d); r.setDate(r.getDate() - r.getDay()); return r.toISOString().slice(0,10); };
+const weekStartOf = d => { const r = new Date(d); r.setDate(r.getDate() - (r.getDay()+6)%7); return r.toISOString().slice(0,10); };
 const monthStartOf = d => d.slice(0,7)+'-01';
 
 const COLORS = ['#7ec8c0','#f5c842','#c4936a','#e07b7b','#8cba80','#a78bd4','#4a8fa8'];
@@ -1508,7 +1508,8 @@ export default function App(){
   // ── Supabase: save / update book ────────────────────────────
   const upsertBook = async (book) => {
     const row = {
-      id: String(book.id), title: book.title, author: book.author||'', genre: book.genre||'',
+      id: String(book.id), user_id: 'default',
+      title: book.title, author: book.author||'', genre: book.genre||'',
       status: book.status, total_pages: book.totalPages||0, current_page: book.currentPage||0,
       start_date: book.startDate||null, end_date: book.endDate||null,
       cover_url: book.coverUrl||'', color: book.color||'#5bbfb5',
@@ -1517,8 +1518,10 @@ export default function App(){
       notion_url: book.notionUrl||'', product: book.product||'',
       updated_at: new Date().toISOString(),
     };
-    const {error} = await supabase.from('books').upsert(row);
-    if(error) console.error('upsert error:', error);
+    console.log('📖 upsert book:', row.id, row.title, 'end_date:', row.end_date);
+    const {data:udata, error} = await supabase.from('books').upsert(row).select();
+    if(error) console.error('❌ upsert error:', error, row);
+    else console.log('✅ upsert success:', udata);
   };
 
   const importBooks = async (newBooks) => {
