@@ -612,18 +612,19 @@ function SessionLog({books}){
   const today=todayStr();
 
   const getPeriodRange=()=>{
+    // toISOStringはUTCになるのでローカル日付文字列を直接作る
+    const localDate=(d)=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
     const t=new Date(today);
     if(period==='week'){
       const s=new Date(t); s.setDate(s.getDate()-(s.getDay()+6)%7+customOffset*7);
       const e=new Date(s); e.setDate(e.getDate()+6);
-      return [s.toISOString().slice(0,10), e.toISOString().slice(0,10)];
+      return [localDate(s), localDate(e)];
     }
     if(period==='month'){
       const y=t.getFullYear(), m=t.getMonth()+customOffset;
-      const d=new Date(y,m,1);
-      const s=d.toISOString().slice(0,10);
-      const e=new Date(d.getFullYear(),d.getMonth()+1,0).toISOString().slice(0,10);
-      return [s,e];
+      const first=new Date(y,m,1);
+      const last=new Date(y,m+1,0);
+      return [localDate(first), localDate(last)];
     }
     if(period==='year'){
       const y=t.getFullYear()+customOffset;
