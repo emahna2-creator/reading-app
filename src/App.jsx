@@ -159,7 +159,7 @@ const Fonts = () => (
     .cal-dow:first-child { background:var(--choco); }
     .cal-row { display:contents; }
     .cal-week-label { background:var(--mint-xpale); display:flex; flex-direction:column; align-items:center; justify-content:center; border-right:1px solid var(--rule); border-bottom:1px solid var(--rule); padding:1px 0; gap:0; }
-    .cal-cell { border-right:1px solid var(--rule); padding:3px 3px 4px; position:relative; background:var(--white); min-height:64px; }
+    .cal-cell { border-right:1px solid var(--rule); border-bottom:1px solid var(--rule); padding:1px 1px 2px; position:relative; background:var(--white); min-height:16px; overflow:hidden; }
     .cal-cell:last-child { border-right:none; }
     .cal-cell.other-month { background:var(--cream2); opacity:.5; }
     .cal-cell.today-cell { background:var(--mint-xpale); }
