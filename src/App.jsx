@@ -526,6 +526,7 @@ function MonthlyCalendar({books}){
                   return(
                     <div key={`b${li}_${ci}`} style={{
                       borderRight:ci<6?'1px solid var(--rule)':'',
+                      borderBottom:li===bookIds.length-1?'1px solid var(--rule)':'',
                       background:isToday?'var(--mint-xpale)':'var(--white)',
                       height:18,
                       position:'relative',
@@ -606,15 +607,32 @@ function MonthlyCalendar({books}){
 // ══════════════════════════════════════════════════════════════
 function SessionLog({books}){
   const [period,setPeriod]=useState('week');
+  const [customOffset,setCustomOffset]=useState(0);
   const [open,setOpen]=useState({});
   const today=todayStr();
 
-  const inPeriod=d=>{
-    if(period==='week') return d>=weekStartOf(today)&&d<=today;
-    if(period==='month') return d>=monthStartOf(today)&&d<=today;
-    if(period==='year') return d>=`${today.slice(0,4)}-01-01`&&d<=today;
-    return true;
+  const getPeriodRange=()=>{
+    const t=new Date(today);
+    if(period==='week'){
+      const s=new Date(t); s.setDate(s.getDate()-(s.getDay()+6)%7+customOffset*7);
+      const e=new Date(s); e.setDate(e.getDate()+6);
+      return [s.toISOString().slice(0,10), e.toISOString().slice(0,10)];
+    }
+    if(period==='month'){
+      const y=t.getFullYear(), m=t.getMonth()+customOffset;
+      const d=new Date(y,m,1);
+      const s=d.toISOString().slice(0,10);
+      const e=new Date(d.getFullYear(),d.getMonth()+1,0).toISOString().slice(0,10);
+      return [s,e];
+    }
+    if(period==='year'){
+      const y=t.getFullYear()+customOffset;
+      return [`${y}-01-01`,`${y}-12-31`];
+    }
+    return ['0000-01-01','9999-12-31'];
   };
+  const [pStart,pEnd]=getPeriodRange();
+  const inPeriod=d=>d>=pStart&&d<=pEnd;
 
   const allSessions=books.flatMap(b=>
     b.sessions.filter(s=>inPeriod(s.date)).map(s=>({...s,bookId:b.id,bookTitle:b.title,bookColor:b.color}))
@@ -631,10 +649,23 @@ function SessionLog({books}){
   return(
     <div>
       <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,flexWrap:'wrap'}}>
-        <h2 className="klee" style={{fontSize:16,fontWeight:600}}>📋 セッションログ</h2>
-        <div style={{marginLeft:'auto',display:'flex',gap:4}}>
-          {[['week','今週'],['month','今月'],['year','今年'],['all','全期間']].map(([v,l])=>(
-            <button key={v} onClick={()=>setPeriod(v)}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
+          <h2 className="klee" style={{fontSize:16,fontWeight:600}}>📋 セッションログ</h2>
+          {period!=='all'&&customOffset!==0&&(
+            <span className="klee" style={{fontSize:11,color:'var(--mint)'}}>
+              {period==='week'?`${pStart.slice(5).replace('-','/')}〜${pEnd.slice(5).replace('-','/')}`:
+               period==='month'?`${pStart.slice(0,7).replace('-','年')}月`:
+               `${pStart.slice(0,4)}年`}
+            </span>
+          )}
+        </div>
+        <div style={{marginLeft:'auto',display:'flex',gap:4,alignItems:'center',flexWrap:'wrap'}}>
+          {period!=='all'&&(
+            <button onClick={()=>setCustomOffset(o=>o-1)}
+              style={{padding:'3px 10px',fontSize:14,borderRadius:8,border:'1.5px solid var(--rule)',background:'var(--cream2)',cursor:'pointer',color:'var(--choco-soft)'}}>‹</button>
+          )}
+          {[['week','週'],['month','月'],['year','年'],['all','全期間']].map(([v,l])=>(
+            <button key={v} onClick={()=>{setPeriod(v);setCustomOffset(0);}}
               style={{padding:'5px 12px',fontSize:11,fontFamily:'Klee One',cursor:'pointer',borderRadius:8,
                 background:period===v?'var(--mint)':'transparent',
                 color:period===v?'#fff':'var(--choco-soft)',
@@ -642,6 +673,10 @@ function SessionLog({books}){
               {l}
             </button>
           ))}
+          {period!=='all'&&(
+            <button onClick={()=>setCustomOffset(o=>Math.min(o+1,0))} disabled={customOffset===0}
+              style={{padding:'3px 10px',fontSize:14,borderRadius:8,border:'1.5px solid var(--rule)',background:'var(--cream2)',cursor:'pointer',color:'var(--choco-soft)',opacity:customOffset===0?.3:1}}>›</button>
+          )}
         </div>
       </div>
 
