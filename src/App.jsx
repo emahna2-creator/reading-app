@@ -167,17 +167,17 @@ const Fonts = () => (
     .day-num { font-family:'Klee One',cursive; font-size:8px; color:var(--choco-soft); width:14px; height:14px; display:flex; align-items:center; justify-content:center; margin-bottom:1px; position:relative; }
     .read-circle { position:absolute; inset:-3px; border-radius:50% 48% 52% 50% / 48% 52% 48% 52%; border:2px solid var(--mint); opacity:.7; pointer-events:none; transform:rotate(-2deg); }
     .tl-bars { display:flex; flex-direction:column; gap:2px; margin-top:2px; }
-    .tl-bar-row { position:relative; height:12px; }
+    .tl-bar-row { position:relative; height:16px; }
     /* セルの端まで伸ばす: left/right をネガティブマージンでpadding分だけ広げる */
-    .tl-bar { height:5px; border-radius:0; position:absolute; top:6px; left:-1px; right:-1px; }
+    .tl-bar { height:4px; border-radius:0; position:absolute; top:7px; left:-1px; right:-1px; }
     .tl-bar.cap-left  { left:2px; border-radius:3px 0 0 3px; }
     .tl-bar.cap-right { right:2px; border-radius:0 3px 3px 0; }
     .tl-bar.cap-both  { left:2px; right:2px; border-radius:3px; }
     .tl-bar.cap-none  { left:-1px; right:-1px; border-radius:0; }
     /* タイトル: 濃いチョコ色・太字 */
-    .tl-label { font-family:'Klee One',cursive; font-size:6px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; position:absolute; left:1px; top:0; line-height:12px; pointer-events:none; max-width:calc(100% - 2px); color:var(--choco); text-shadow:0 0 3px #fff,0 0 3px #fff; }
-    .tl-done  { font-family:'Klee One',cursive; font-size:6px; font-weight:600; position:absolute; right:1px; top:0; line-height:11px; }
-    .tl-min   { font-family:'DM Mono',monospace; font-size:6px; color:var(--choco-soft); font-weight:600; position:absolute; right:1px; top:0; line-height:11px; }
+    .tl-label { font-family:'Klee One',cursive; font-size:9px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; position:absolute; left:1px; top:0; line-height:16px; pointer-events:none; max-width:calc(100% - 2px); color:var(--choco); text-shadow:0 0 3px #fff,0 0 3px #fff; }
+    .tl-done  { font-family:'Klee One',cursive; font-size:8px; font-weight:600; position:absolute; right:1px; top:0; line-height:16px; }
+    .tl-min   { font-family:'DM Mono',monospace; font-size:8px; color:var(--choco-soft); font-weight:600; position:absolute; right:1px; top:0; line-height:16px; }
 
     /* import panel */
     .import-panel { background:var(--mint-pale); border:2px dashed var(--mint-light); border-radius:14px; padding:20px; text-align:center; }
@@ -546,8 +546,8 @@ function MonthlyCalendar({books}){
                       )}
                       {/* タイトル */}
                       {showTitle&&(
-                        <span className="tl-label" style={{top:0,lineHeight:'8px',paddingTop:1,zIndex:2,
-                          fontSize:7,fontWeight:700,color:'var(--choco)',
+                        <span className="tl-label" style={{top:0,lineHeight:'16px',zIndex:2,
+                          fontSize:9,fontWeight:700,color:'var(--choco)',
                           textShadow:'0 0 3px #fff,0 0 3px #fff,0 0 3px #fff',
                         }}>
                           {meta.title.length>9?meta.title.slice(0,8)+'…':meta.title}
