@@ -1569,9 +1569,37 @@ export default function App(){
   };
 
   const importBooks = async (newBooks) => {
-    const existing = new Set(books.map(b=>b.title));
-    const fresh = newBooks.filter(b => !existing.has(b.title));
-    if(fresh.length===0){ showToast('新しい本はありませんでした'); return; }
+    const existingMap = new Map(books.map(b=>[b.title, b]));
+    const fresh = newBooks.filter(b => !existingMap.has(b.title));
+    // 既存の本で読了日・ステータスが変わったものを更新
+    const updated = newBooks.filter(b => {
+      const ex = existingMap.get(b.title);
+      if(!ex) return false;
+      return (b.endDate && b.endDate !== ex.endDate) || (b.status !== ex.status);
+    });
+    // 既存本の更新をSupabaseに反映
+    for(const b of updated){
+      const ex = existingMap.get(b.title);
+      const row = {id:String(ex.id), end_date:b.endDate||null, status:b.status, user_id:'default',
+        title:ex.title, author:ex.author||'', genre:ex.genre||'',
+        total_pages:ex.totalPages||0, current_page:ex.currentPage||0,
+        start_date:ex.startDate||null, cover_url:ex.coverUrl||'', color:ex.color||'#5bbfb5',
+        isbn:ex.isbn||'', publisher:ex.publisher||'',
+        highlight_count:ex.highlightCount||0, notion_url:ex.notionUrl||'', product:ex.product||'',
+      };
+      const {error} = await supabase.from('books').upsert(row);
+      if(error) console.error('update error:', error);
+    }
+    if(updated.length>0){
+      setBooks(prev=>prev.map(b=>{
+        const upd=updated.find(u=>u.title===b.title);
+        return upd?{...b, endDate:upd.endDate, status:upd.status}:b;
+      }));
+    }
+    if(fresh.length===0){
+      showToast(updated.length>0?`✅ ${updated.length}冊の情報を更新しました`:'新しい本はありませんでした');
+      return;
+    }
     const rows = fresh.map(b=>({
       id: String(b.id), title: b.title, author: b.author||'', genre: b.genre||'',
       status: b.status||'want', total_pages: b.totalPages||0, current_page: 0,
@@ -1588,7 +1616,7 @@ export default function App(){
     }
     setBooks(prev=>[...fresh.map(b=>({...b,sessions:[],highlights:[]})),...prev]);
     setTab('shelf');
-    showToast(`📚 ${fresh.length}冊インポートしました！`);
+    showToast(`📚 ${fresh.length}冊追加${updated.length>0?`・${updated.length}冊更新`:''}しました！`);
   };
 
   const importTogglSessions = async (togglSessions, isDetailed=false) => {
