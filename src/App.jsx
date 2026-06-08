@@ -1580,7 +1580,10 @@ export default function App(){
     // 既存本の更新をSupabaseに反映
     for(const b of updated){
       const ex = existingMap.get(b.title);
-      const row = {id:String(ex.id), end_date:b.endDate||null, status:b.status, user_id:'default',
+      // セッションがある本はreadingを維持（Notionがwantでもトグルで読んでたら読中）
+      const hasSessions = ex.sessions && ex.sessions.length > 0;
+      const newStatus = b.status==='done' ? 'done' : hasSessions ? 'reading' : b.status;
+      const row = {id:String(ex.id), end_date:b.endDate||null, status:newStatus, user_id:'default',
         title:ex.title, author:ex.author||'', genre:ex.genre||'',
         total_pages:ex.totalPages||0, current_page:ex.currentPage||0,
         start_date:ex.startDate||null, cover_url:ex.coverUrl||'', color:ex.color||'#5bbfb5',
@@ -1593,7 +1596,10 @@ export default function App(){
     if(updated.length>0){
       setBooks(prev=>prev.map(b=>{
         const upd=updated.find(u=>u.title===b.title);
-        return upd?{...b, endDate:upd.endDate, status:upd.status}:b;
+        if(!upd) return b;
+        const hasSessions = b.sessions && b.sessions.length > 0;
+        const newStatus = upd.status==='done' ? 'done' : hasSessions ? 'reading' : upd.status;
+        return {...b, endDate:upd.endDate, status:newStatus};
       }));
     }
     if(fresh.length===0){
