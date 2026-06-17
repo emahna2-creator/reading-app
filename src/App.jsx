@@ -685,7 +685,7 @@ function SessionLog({books}){
       <div style={{display:'flex',gap:12,padding:'12px 16px',background:'linear-gradient(135deg,var(--mint-pale),var(--mimosa-pale))',borderRadius:12,marginBottom:14,flexWrap:'wrap'}}>
         {[
           ['📖',fmtM(totalMin),'読書時間'],
-          ['🎯',String(books.filter(b=>b.endDate&&inPeriod(b.endDate)).length)+'回','セッション数'],
+          ['🎯',String(books.filter(b=>b.endDate&&inPeriod(b.endDate)).length)+'冊','読了'],
           ['📅',String(new Set(allSessions.map(s=>s.date)).size)+'日','読書日数'],
         ].map(([em,val,label])=>(
           <div key={label} style={{flex:1,textAlign:'center',minWidth:70}}>
@@ -1866,3 +1866,4 @@ export default function App(){
     </>
   );
 }
+
