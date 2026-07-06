@@ -605,7 +605,7 @@ function MonthlyCalendar({books}){
 // ══════════════════════════════════════════════════════════════
 // ② SESSION LOG
 // ══════════════════════════════════════════════════════════════
-function SessionLog({books}){
+function SessionLog({books,onDeleteSession}){
   const [period,setPeriod]=useState('week');
   const [customOffset,setCustomOffset]=useState(0);
   const [open,setOpen]=useState({});
@@ -719,6 +719,12 @@ function SessionLog({books}){
                     <div style={{display:'flex',alignItems:'center',gap:10}}>
                       {s.note&&<span style={{fontSize:10,color:'var(--ink3)',fontStyle:'italic'}}>{s.note}</span>}
                       <span className="klee" style={{fontSize:13,color:'var(--mint)',fontWeight:600}}>{fmtM(s.minutes)}</span>
+                      <button
+                        onClick={()=>{if(window.confirm(`このセッション（${s.date} ${s.start}）を削除しますか？`))onDeleteSession(s.id,s.bookId);}}
+                        title="このセッションを削除"
+                        style={{fontSize:12,color:'var(--ink3)',background:'none',border:'none',cursor:'pointer',padding:'2px 4px',lineHeight:1}}>
+                        🗑
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -1646,18 +1652,27 @@ export default function App(){
       found = books.find(b => normalize(b.title).startsWith(tName) && tName.length >= 4);
       if(found) return found;
       // 3. Toggl名が本のタイトルで始まる（本タイトルが短い）
+      //    ただし続きが「巻数・上下編」等の装飾的な接尾辞のときだけ許可し、
+      //    "WCnote"のような無関係な文字列が続くケースは誤爆防止のため除外する
+      const isDecorativeSuffix = suf =>
+        suf.length===0 || suf.length<=2 ||
+        /^[0-9ivxlc]+$/i.test(suf) ||
+        /^(上|下|前編|後編|前|後|完|続|特別編|番外編)+$/.test(suf);
       found = books.find(b => {
         const bName = normalize(b.title);
-        return bName.length >= 6 && tName.startsWith(bName);
+        if(bName.length < 6 || !tName.startsWith(bName)) return false;
+        return isDecorativeSuffix(tName.slice(bName.length));
       });
       if(found) return found;
       // 4. 本のタイトルにToggl名が含まれる（中間一致）
       found = books.find(b => tName.length >= 6 && normalize(b.title).includes(tName));
       if(found) return found;
-      // 5. Toggl名に本のタイトルが含まれる（逆包含）
+      // 5. Toggl名の末尾が本のタイトルと一致する（前に装飾的な接頭辞があるだけのケース）
+      //    例: 「読書リフレクション」のように前置きが付くケース。中間一致は誤爆しやすいため廃止。
       found = books.find(b => {
         const bName = normalize(b.title);
-        return bName.length >= 6 && tName.includes(bName);
+        if(bName.length < 6 || !tName.endsWith(bName)) return false;
+        return isDecorativeSuffix(tName.slice(0, tName.length-bName.length));
       });
       return found || null;
     };
@@ -1729,6 +1744,20 @@ export default function App(){
     const unmatched=[...new Set(togglSessions.filter(s=>!matchBook(s.projectName)).map(s=>s.projectName))];
     setUnmatchedProjects(unmatched);
     showToast(`⏱ ${matched}件反映、未マッチ${unmatched.length}件`, 3000);
+  };
+
+  // セッション（読書ログ）を1件削除。誤って別の本に紐づいたTogglセッションなどを消すために使う。
+  const deleteSession = async (sessionId, bookId) => {
+    const { error } = await supabase.from('sessions').delete().eq('id', sessionId);
+    if(error){
+      console.error('❌ session delete error:', error);
+      showToast('❌ 削除に失敗しました', 2500);
+      return;
+    }
+    setBooks(prev=>prev.map(b=>
+      b.id===bookId ? {...b, sessions:b.sessions.filter(s=>s.id!==sessionId)} : b
+    ));
+    showToast('🗑 セッションを削除しました', 2000);
   };
 
   const addBook = async (data) => {
@@ -1826,7 +1855,7 @@ export default function App(){
           {tab==='shelf'&&<BookShelf books={books} selectedId={selId} onSelect={setSelId}
             onEdit={b=>{setEditBook(b);setShowAdd(true)}}/>}
           {tab==='calendar'&&<MonthlyCalendar books={books}/>}
-          {tab==='log'&&<SessionLog books={books}/>}
+          {tab==='log'&&<SessionLog books={books} onDeleteSession={deleteSession}/>}
           {tab==='hl'&&<HighlightPanel books={books} selectedId={selId} onSelectBook={setSelId} onAddHighlight={addHighlight}/>}
           {tab==='timer'&&<TimerPanel books={books} onSaveSession={saveSession}/>}
           {tab==='import'&&(
