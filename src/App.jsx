@@ -1356,7 +1356,7 @@ function ImportPanel({onImport, onTogglImport}){
 // ══════════════════════════════════════════════════════════════
 // ADD/EDIT BOOK MODAL
 // ══════════════════════════════════════════════════════════════
-function AddBookModal({onAdd,onClose,editBook}){
+function AddBookModal({onAdd,onClose,onDelete,editBook}){
   const [step,setStep]=useState(editBook?'form':'isbn');
   const [isbn,setIsbn]=useState(editBook?.isbn||'');
   const [title,setTitle]=useState(editBook?.title||'');
@@ -1461,10 +1461,18 @@ function AddBookModal({onAdd,onClose,editBook}){
                 ))}
               </div>
             </div>
-            <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:4}}>
-              {!editBook&&<button className="btn btn-o" style={{fontSize:11}} onClick={()=>setStep('isbn')}>戻る</button>}
-              <button className="btn btn-o" style={{fontSize:11}} onClick={onClose}>キャンセル</button>
-              <button className="btn btn-mint" onClick={submit} disabled={!title.trim()}>{editBook?'💾 保存':'✨ 追加する'}</button>
+            <div style={{display:'flex',gap:8,justifyContent:editBook?'space-between':'flex-end',marginTop:4}}>
+              {editBook&&
+                <button className="btn btn-o" style={{fontSize:11,color:'#e07b7b',borderColor:'#e07b7b'}}
+                  onClick={()=>{ if(window.confirm(`「${editBook.title}」を削除しますか？この操作は取り消せません。`)) onDelete(editBook.id); }}>
+                  🗑 削除する
+                </button>
+              }
+              <div style={{display:'flex',gap:8}}>
+                {!editBook&&<button className="btn btn-o" style={{fontSize:11}} onClick={()=>setStep('isbn')}>戻る</button>}
+                <button className="btn btn-o" style={{fontSize:11}} onClick={onClose}>キャンセル</button>
+                <button className="btn btn-mint" onClick={submit} disabled={!title.trim()}>{editBook?'💾 保存':'✨ 追加する'}</button>
+              </div>
             </div>
           </div>
         )}
@@ -1760,6 +1768,21 @@ export default function App(){
     showToast('🗑 セッションを削除しました', 2000);
   };
 
+  // 本を1冊削除。Notion重複登録などの後片付けに使う。セッション・ハイライトも一緒に消す。
+  const deleteBook = async (bookId) => {
+    const { error } = await supabase.from('books').delete().eq('id', bookId);
+    if(error){
+      console.error('❌ book delete error:', error);
+      showToast('❌ 削除に失敗しました', 2500);
+      return;
+    }
+    await supabase.from('sessions').delete().eq('book_id', bookId);
+    await supabase.from('highlights').delete().eq('book_id', bookId);
+    setBooks(prev=>prev.filter(b=>b.id!==bookId));
+    setShowAdd(false); setEditBook(null);
+    showToast('🗑 本を削除しました', 2000);
+  };
+
   const addBook = async (data) => {
     const isEdit = !!data.id;
     const id = isEdit ? String(data.id) : String(Date.now());
@@ -1890,7 +1913,7 @@ export default function App(){
         </div>
       </div>
 
-      {showAdd&&<AddBookModal onAdd={addBook} onClose={()=>{setShowAdd(false);setEditBook(null)}} editBook={editBook}/>}
+      {showAdd&&<AddBookModal onAdd={addBook} onDelete={deleteBook} onClose={()=>{setShowAdd(false);setEditBook(null)}} editBook={editBook}/>}
       {toast&&<div className="toast">{toast}</div>}
     </>
   );
