@@ -374,36 +374,60 @@ function MonthlyCalendar({books}){
     return tot;
   };
 
+  // 月内で各本の「最初・最後の読書日」を計算（週をまたいで点線＝読みかけを表すため）
+  const monthRange={};
+  monthSessions.forEach(([d,list])=>{
+    list.forEach(s=>{
+      const r=monthRange[s.bookId];
+      if(!r) monthRange[s.bookId]={id:s.bookId,first:d,last:d};
+      else{ if(d<r.first) r.first=d; if(d>r.last) r.last=d; }
+    });
+  });
+
   // 週ごとに「登場する本のレーン」を計算
-  // 週内にセッションがある本 → 実線、週内で前後にセッションがあるのに当日なし → 点線
+  // 月内の最初〜最後の読書日の間にある本 → その週に読書がなくてもレーンを出す
+  // セッションあり → 実線、範囲内でセッションなし → 点線
   const buildWeekLanes=(wk)=>{
-    // この週に1度でも登場した本を順序保持で収集
+    const dsOf=(c)=>`${year}-${pad(month+1)}-${pad(c.d)}`;
+
+    // 1) この週に読書した本を、これまで通りの順序で収集
     const bookIds=[];
     const seen=new Set();
     wk.forEach(c=>{
       if(!c.d) return;
-      const ds=`${year}-${pad(month+1)}-${pad(c.d)}`;
-      (sessionMap[ds]||[]).forEach(s=>{
+      (sessionMap[dsOf(c)]||[]).forEach(s=>{
         if(!seen.has(s.bookId)){ seen.add(s.bookId); bookIds.push(s.bookId); }
       });
     });
 
-    // 各本の週内の「最初・最後のセッション日インデックス」を計算
+    // 2) この週は読んでいないが、月内の読書範囲がこの週をまたぐ本を追加
+    Object.values(monthRange).forEach(r=>{
+      const id=r.id; // 数値IDのままで比較するため、キー(文字列)ではなく元のidを使う
+      if(seen.has(id)) return;
+      const overlaps=wk.some(c=>c.d && dsOf(c)>=r.first && dsOf(c)<=r.last);
+      if(overlaps){ seen.add(id); bookIds.push(id); }
+    });
+
+    // 3) 各本の情報（週内の最初・最後のセッション日、月内範囲に入る最初のセル）
     const bookInfo={};
     bookIds.forEach(id=>{
       const b=books.find(b=>b.id===id);
       if(!b) return;
-      let first=-1, last=-1;
+      const r=monthRange[id];
+      let first=-1, last=-1, rangeFirst=-1;
       const sessionDays=new Set();
       wk.forEach((c,ci)=>{
         if(!c.d) return;
-        const ds=`${year}-${pad(month+1)}-${pad(c.d)}`;
+        const ds=dsOf(c);
         const has=(sessionMap[ds]||[]).some(s=>s.bookId===id);
         if(has){ sessionDays.add(ci); if(first===-1)first=ci; last=ci; }
+        if(r && rangeFirst===-1 && ds>=r.first && ds<=r.last) rangeFirst=ci;
       });
       bookInfo[id]={
         color:b.color, title:b.title, endDate:b.endDate,
         first, last, sessionDays,
+        rangeFirst,                          // タイトル表示位置
+        rangeStart:r?r.first:'', rangeEnd:r?r.last:'', // 月内の読書範囲（週をまたぐ）
       };
     });
     return {bookIds, bookInfo};
@@ -512,8 +536,8 @@ function MonthlyCalendar({books}){
                   const ds=`${year}-${pad(month+1)}-${pad(cell.d)}`;
                   const hasSession=meta.sessionDays.has(ci);
                   const isToday=ds===today;
-                  // 週内でこのセルが最初・最後のセッションの間にあるか（点線対象）
-                  const inRange = ci>=meta.first && ci<=meta.last;
+                  // 月内の最初〜最後の読書日の間か（週をまたいでも点線対象）
+                  const inRange = ds>=meta.rangeStart && ds<=meta.rangeEnd;
                   // この日のこの本の時間
                   const bookDayMin=(sessionMap[ds]||[]).filter(s=>s.bookId===bookId).reduce((a,s)=>a+s.minutes,0);
                   const isDone=meta.endDate===ds;
@@ -521,7 +545,7 @@ function MonthlyCalendar({books}){
                   const isFirst=ci===meta.first, isLast=ci===meta.last;
                   const capClass=isFirst&&isLast?'cap-both':isFirst?'cap-left':isLast||isDone?'cap-right':'cap-none';
                   // 週の最初のセル(日曜 or 月の最初のセッション)にタイトル
-                  const showTitle=ci===meta.first;
+                  const showTitle=ci===meta.rangeFirst;
 
                   return(
                     <div key={`b${li}_${ci}`} style={{
